@@ -67,7 +67,8 @@ def agent_objective(trial: optuna.Trial) -> int:
 
     # Determine the hyperparameters
     algorithm = trial.suggest_categorical("algorithm", ["PPO", "A2C", "DQN"])
-    policy = "MlpPolicy"
+    # policy = "MlpPolicy"
+    policy = "MultiInputPolicy"
 
     # Get trial's hyperparameters that are common to all algorithms
     learning_rate = trial.suggest_float("learning_rate", 0, 1)
