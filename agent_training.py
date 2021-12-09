@@ -35,7 +35,7 @@ def clear_console() -> None:
     os.system(clear_command)
 
 
-def factors(n) -> list:
+def factors(n: int) -> list[int]:
     """
     Gets an ordered list of the factors for a given number.
 
