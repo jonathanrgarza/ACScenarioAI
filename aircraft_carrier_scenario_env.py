@@ -70,7 +70,7 @@ def _get_randomized_state() -> dict:
 
 class AircraftCarrierScenarioEnv(Env):
     """
-    Environment representing an (random) aircraft carrier scenario.
+    Environment representing a random aircraft carrier scenario.
     """
     def __init__(self) -> None:
         self.action_space = MultiDiscrete([6, 6, 2, 2])
@@ -153,7 +153,7 @@ class AircraftCarrierScenarioEnv(Env):
         self.state["currentShipDamage"][ship] += 1
         self.state["missiles"] -= 1
 
-        # Currently no reward for shooting a ship, all comes from _should_attack
+        # Currently, no reward for shooting a ship, all comes from _should_attack
 
         return reward
 
@@ -162,7 +162,7 @@ class AircraftCarrierScenarioEnv(Env):
         Performs a step in the environment.
 
         :param action: The action to take for this step.
-        :return: The observation dictionary, the reward, if done, and a info dictionary.
+        :return: The observation dictionary, the reward, if done, and an info dictionary.
         """
         info = {}
         reward: int = 0
@@ -208,12 +208,12 @@ class AircraftCarrierScenarioEnv(Env):
             return self.state, can_attack_reward, False, info
 
         # ############ Ideas ##############
-        # Count up assets instead of down. Add a cap and remove end condition for assets
-        # Change Reward/Loss system for expected damage
-        #   Expected damage is now Expected hits. Remove Rolls
-        # Add a calculated ratio reward for threats in the defending arrays
-        # Add in standard deviation for rewards to encourage spreading out more hits when missiles are available
-        #    Prio higher expected hits targets
+        # Count up assets instead of down. Add a cap and remove end condition for assets.
+        # Change Reward/Loss system for expected damage.
+        #   Expected damage is now Expected hits. Remove Rolls.
+        # Add a calculated ratio reward for threats in the defending arrays.
+        # Add in standard deviation for rewards to encourage spreading out more hits when missiles are available.
+        #    Prio higher expected hits targets.
 
         # Add penalty for going over an assets
 
@@ -263,7 +263,7 @@ class AircraftCarrierScenarioEnv(Env):
 
 class SpecificAircraftCarrierScenarioEnv(AircraftCarrierScenarioEnv):
     """
-    Environment representing a specific (non-random) aircraft carrier scenario.
+    Environment representing a specific, non-random, aircraft carrier scenario.
     """
     def __init__(self, scenario: AircraftCarrierScenario) -> None:
         super().__init__()
