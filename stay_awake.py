@@ -38,7 +38,7 @@ elif system_type == "Linux":
             [u"systemctl", u"unmask", u"sleep.target", u"suspend.target", u"hibernate.target", u"hybrid-sleep.target"])
 
 
-elif system_type == "darwin":
+elif system_type == "Darwin":
     from subprocess import Popen, PIPE
 
     _darwin_process: Optional[Popen] = None

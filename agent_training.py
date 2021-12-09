@@ -141,7 +141,7 @@ def perform_optuna_optimizing():
 
     # Create dir if needed
     try:
-        os.makedirs("/models/optuna", exist_ok=True)
+        os.makedirs("models/optuna", exist_ok=True)
     except OSError:
         print("Could not create folder 'models/optuna'. Create this folder first and try again.")
         exit(1)
