@@ -1,21 +1,21 @@
 """
 Module for training the AI agent.
 """
-import os
-import time
 import logging
+import os
 import sys
+import time
 from datetime import timedelta
 
 import optuna
 from gym import Env
 from optuna.visualization import plot_optimization_history, plot_param_importances
-from stable_baselines3 import PPO, A2C, DQN
+from stable_baselines3 import PPO, A2C
 from stable_baselines3.common.callbacks import StopTrainingOnRewardThreshold, EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.logger import Logger, configure
+from stable_baselines3.common.monitor import Monitor
 
 import stay_awake
 from aircraft_carrier_scenario_env import AircraftCarrierScenarioEnv
@@ -66,7 +66,7 @@ def agent_objective(trial: optuna.Trial) -> int:
     eval_env = Monitor(gym_env)
 
     # Determine the hyperparameters
-    algorithm = trial.suggest_categorical("algorithm", ["PPO", "A2C", "DQN"])
+    algorithm = trial.suggest_categorical("algorithm", ["PPO", "A2C"])
     # policy = "MlpPolicy"
     policy = "MultiInputPolicy"
 
@@ -99,10 +99,6 @@ def agent_objective(trial: optuna.Trial) -> int:
         n_steps = trial.suggest_int("n_steps", 1, 5 * 5)
 
         model = A2C(policy, eval_env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps)
-    elif algorithm == "DQN":
-        # batch_size = trial.suggest_int("batch_size", 1, 32 * 5)
-
-        model = DQN(policy, eval_env, learning_rate=learning_rate, gamma=gamma)
     else:
         raise ValueError(f"Invalid algorithm selected: {algorithm}")
 
@@ -110,6 +106,7 @@ def agent_objective(trial: optuna.Trial) -> int:
 
     try:
         # No keep awake needed here as this is called by optuna which has been kept awake
+        print(f"Starting a trial '{trial.number}' with '{algorithm}' algorithm")
         model.learn(25000 * 10, callback=eval_callback)
 
         model.env.close()
