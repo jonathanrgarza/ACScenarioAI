@@ -2,11 +2,12 @@
 Contains the classes related to the aircraft carrier scenario gym environment.
 """
 import random
+
+import numpy as np
 from gym import Env
 from gym.spaces import Discrete, Dict, MultiBinary, MultiDiscrete
-import numpy as np
-from aircraft_carrier_scenario import AircraftCarrierScenario
 
+from aircraft_carrier_scenario import AircraftCarrierScenario
 
 NUMBER_OF_TARGETS: int = 6
 DEFENSE_ARRAY: list = [
@@ -92,8 +93,7 @@ class AircraftCarrierScenarioEnv(Env):
                 "target6Targets": MultiBinary(6),
                 "assets": MultiDiscrete([100, 100])
             })
-        self.state = None
-        self.reset()
+        self.state: dict = self.reset()
 
     def render(self, mode="human") -> None:
         """
@@ -253,11 +253,12 @@ class AircraftCarrierScenarioEnv(Env):
         # Return step information
         return self.state, reward, done, info
 
-    def reset(self) -> None:
+    def reset(self) -> dict:
         """
         Resets the environment to an initial state.
         """
         self.state = _get_randomized_state()
+        return self.state
 
 
 class SpecificAircraftCarrierScenarioEnv(AircraftCarrierScenarioEnv):
@@ -282,8 +283,9 @@ class SpecificAircraftCarrierScenarioEnv(AircraftCarrierScenarioEnv):
         """
         return self._scenario
 
-    def reset(self) -> None:
+    def reset(self) -> dict:
         """
         Resets the environment to the initial state.
         """
         self.state = _get_init_state(self._scenario)
+        return self.state

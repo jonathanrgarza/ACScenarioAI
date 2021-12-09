@@ -55,7 +55,7 @@ def factors(n) -> set:
 
 def agent_objective(trial: optuna.Trial) -> int:
     """
-    Function to use with optuna to tune hyperparameters for taxi environment
+    Function to use with optuna to tune hyperparameters for ACS environment.
 
     :param trial: The optuna trial
     :return: The mean reward for the trial
@@ -138,6 +138,13 @@ def agent_objective(trial: optuna.Trial) -> int:
 
 def perform_optuna_optimizing():
     print("Starting a optuna hyperparameter optimization study run")
+
+    # Create dir if needed
+    try:
+        os.makedirs("/models/optuna", exist_ok=True)
+    except OSError:
+        print("Could not create folder 'models/optuna'. Create this folder first and try again.")
+        exit(1)
 
     # Add stream handler of stdout to show the messages
     optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
