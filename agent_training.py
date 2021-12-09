@@ -298,9 +298,11 @@ def run_agent(perform_training: bool, perform_test: bool, run_env: bool):
 
 
 PERFORM_TRAINING = True
+PERFORM_TESTING = True
 RENDER_ENV = False
 
 if __name__ == "__main__":
     start_time = time.time()
     perform_optuna_optimizing()
+    # run_agent(PERFORM_TRAINING, PERFORM_TESTING, RENDER_ENV)
     print(f"Finished program. Execution time: {timedelta(seconds=(time.time() - start_time))}")
