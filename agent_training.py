@@ -35,13 +35,13 @@ def clear_console() -> None:
     os.system(clear_command)
 
 
-def factors(n) -> set:
+def factors(n) -> list:
     """
     Gets an ordered list of the factors for a given number.
 
     :param n: The number to get factors for.
     :return: A list of all the factors for a given number.
-    :rtype: set
+    :rtype: list
     """
     factor_list = []
     for i in range(1, int(n ** 0.5) + 1):
@@ -49,8 +49,9 @@ def factors(n) -> set:
             factor_list.append(i)
             factor_list.append(n // i)
 
+    factor_list = list(dict.fromkeys(factor_list))  # Get only unique entries
     factor_list.sort()
-    return set(factor_list)
+    return factor_list
 
 
 def agent_objective(trial: optuna.Trial) -> int:
@@ -106,7 +107,7 @@ def agent_objective(trial: optuna.Trial) -> int:
 
     try:
         # No keep awake needed here as this is called by optuna which has been kept awake
-        print(f"Starting a trial '{trial.number}' with '{algorithm}' algorithm")
+        print(f"Starting a trial '{trial.number}' using the '{algorithm}' algorithm")
         model.learn(25000 * 10, callback=eval_callback)
 
         model.env.close()
@@ -135,7 +136,7 @@ def agent_objective(trial: optuna.Trial) -> int:
 
 
 def perform_optuna_optimizing():
-    print("Starting a optuna hyperparameter optimization study run")
+    print("Initializing an optuna hyperparameter optimization study run")
 
     # Create dir if needed
     try:
@@ -155,6 +156,7 @@ def perform_optuna_optimizing():
 
     try:
         with stay_awake.keep_awake():
+            print("Starting an optuna hyperparameter optimization run")
             study.optimize(agent_objective, n_trials=n_trials)
             completed = True
     except KeyboardInterrupt:
