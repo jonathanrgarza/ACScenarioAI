@@ -67,13 +67,16 @@ def agent_objective(trial: optuna.Trial) -> int:
     eval_env = Monitor(gym_env)
 
     # Determine the hyperparameters
-    algorithm = trial.suggest_categorical("algorithm", ["PPO", "A2C"])
+    # algorithm = trial.suggest_categorical("algorithm", ["PPO", "A2C"])
+    algorithm = "PPO"
     # policy = "MlpPolicy"
     policy = "MultiInputPolicy"
 
     # Get trial's hyperparameters that are common to all algorithms
     learning_rate = trial.suggest_float("learning_rate", 0, 1)
     gamma = trial.suggest_float("gamma", 0, 1)
+
+    # Launch tensorboard with command: tensorboard --logdir=models/optuna/logging
 
     if algorithm == "PPO":
         # Get trial's hyperparameters that are for PPO algorithm only
@@ -94,12 +97,13 @@ def agent_objective(trial: optuna.Trial) -> int:
             batch_size = n_steps
 
         model = PPO(policy, eval_env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps, n_epochs=n_epochs,
-                    batch_size=batch_size)
+                    batch_size=batch_size, tensorboard_log="models/optuna/logging", verbose=1)
     elif algorithm == "A2C":
         # Get trial's hyperparameters that are for PPO algorithm only
         n_steps = trial.suggest_int("n_steps", 1, 5 * 5)
 
-        model = A2C(policy, eval_env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps)
+        model = A2C(policy, eval_env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps,
+                    tensorboard_log="models/optuna/logging", verbose=1)
     else:
         raise ValueError(f"Invalid algorithm selected: {algorithm}")
 
@@ -108,7 +112,7 @@ def agent_objective(trial: optuna.Trial) -> int:
     try:
         # No keep awake needed here as this is called by optuna which has been kept awake
         print(f"Starting a trial '{trial.number}' using the '{algorithm}' algorithm")
-        model.learn(25000 * 10, callback=eval_callback)
+        model.learn(25000 * 5, callback=eval_callback)
 
         model.env.close()
         eval_env.close()
