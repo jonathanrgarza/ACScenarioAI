@@ -9,5 +9,5 @@ setup(
     author="Jonathan Garza",
     author_email="",
     description="Package containing AC Carrier Scenario(s), including GYM environments for them.",
-    requires=["gym~=0.19.0", "numpy~=1.21.4"]
+    install_requires=["gym~=0.19.0", "numpy~=1.21.4"]
 )

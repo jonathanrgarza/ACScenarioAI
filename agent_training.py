@@ -165,7 +165,10 @@ def perform_optuna_optimizing():
         exit(1)
 
     # Add stream handler of stdout to show the messages
-    optuna.logging.get_logger("optuna").addHandler(logging.StreamHandler(sys.stdout))
+    logger = optuna.logging.get_logger("optuna")
+    log_handler = logging.StreamHandler(sys.stdout)
+    log_handler.setFormatter(logging.Formatter("[%(asctime)s] %(message)s"))
+    logger.addHandler(log_handler)
     study_name = "agent_study_1"  # Unique identifier of the study
     storage_name = f"sqlite:///models/optuna/{study_name}.db"
     study = optuna.create_study(study_name=study_name, storage=storage_name, direction="maximize", load_if_exists=True)
@@ -185,6 +188,7 @@ def perform_optuna_optimizing():
 
     print("Best trial:")
     trial = study.best_trial
+    print(f"Best trial: {trial.number}")
 
     print("Value: ", trial.value)
 
