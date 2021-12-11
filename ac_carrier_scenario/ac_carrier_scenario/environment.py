@@ -50,7 +50,8 @@ def _get_init_state(scenario: AircraftCarrierScenario) -> dict:
         "target4Targets": np.array([0, 1, 0, 1, 0, 0]),
         "target5Targets": np.array([0, 0, 0, 0, 1, 1]),
         "target6Targets": np.array([0, 0, 0, 0, 1, 1]),
-        "assets": np.array([scenario.jet_count, scenario.pilot_count])
+        "jets": scenario.jet_count,
+        "pilots": scenario.pilot_count
     }
 
 
@@ -91,7 +92,8 @@ class AircraftCarrierScenarioEnv(Env):
                 "target4Targets": MultiBinary(6),
                 "target5Targets": MultiBinary(6),
                 "target6Targets": MultiBinary(6),
-                "assets": MultiDiscrete([100, 100])
+                "jets": Discrete(100),
+                "pilots": Discrete(100)
             })
         self.state: dict = self.reset()
 
@@ -184,15 +186,15 @@ class AircraftCarrierScenarioEnv(Env):
 
             if ship1_index == ship2_index:
                 if shot_down1:
-                    self.state["assets"][0] -= 1
-                    self.state["assets"][1] -= 1
+                    self.state["jets"] -= 1
+                    self.state["pilots"] -= 1
             else:
                 if shot_down1:
-                    self.state["assets"][0] -= 1
-                    self.state["assets"][1] -= 1
+                    self.state["jets"] -= 1
+                    self.state["pilots"] -= 1
                 if shot_down2:
-                    self.state["assets"][0] -= 1
-                    self.state["assets"][1] -= 1
+                    self.state["jets"] -= 1
+                    self.state["pilots"] -= 1
 
             self._shoot_ship(ship1_index)
 
@@ -221,10 +223,10 @@ class AircraftCarrierScenarioEnv(Env):
         if self.state["missiles"] < 0:
             reward -= 2000
         # Add penalty for going over jet count
-        if self.state["assets"][0] < 0:
+        if self.state["jets"] < 0:
             reward -= 200
-        # Add penalty for going over jet count
-        if self.state["assets"][1] < 0:
+        # Add penalty for going over pilot count
+        if self.state["pilots"] < 0:
             reward -= 200
 
         is_expected_damage_met = True
@@ -240,14 +242,14 @@ class AircraftCarrierScenarioEnv(Env):
             # Reward for each missile remaining
             reward += max(0, self.state["missiles"]) * 10
             # Reward for each jet remaining
-            reward += max(0, self.state["assets"][0]) * 5
+            reward += max(0, self.state["jets"]) * 5
             # Reward for each pilot remaining
-            reward += max(0, self.state["assets"][1]) * 5
+            reward += max(0, self.state["pilots"]) * 5
 
         if self.state["missiles"] <= 0:
             done = True
 
-        if self.state["assets"][0] <= 0 or self.state["assets"][1] <= 0:
+        if self.state["jets"] <= 0 or self.state["pilots"] <= 0:
             done = True
 
         # Return step information
