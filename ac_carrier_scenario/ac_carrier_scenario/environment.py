@@ -7,7 +7,7 @@ import numpy as np
 from gym import Env
 from gym.spaces import Discrete, Dict, MultiBinary, MultiDiscrete
 
-from ac_carrier_scenario.ac_carrier_scenario.scenarios import AircraftCarrierScenario
+from .scenarios import AircraftCarrierScenario
 
 NUMBER_OF_TARGETS: int = 6
 DEFENSE_ARRAY: list = [

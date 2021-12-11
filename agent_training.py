@@ -21,6 +21,10 @@ from stable_baselines3.common.monitor import Monitor
 import stay_awake
 from trial_eval_callback import TrialEvalCallback
 
+# Import the custom env
+# noinspection PyUnresolvedReferences
+from ac_carrier_scenario.environment import AircraftCarrierScenarioEnv  # pytype: disable=import-error
+
 
 def clear_console() -> None:
     """
