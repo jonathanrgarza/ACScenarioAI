@@ -7,6 +7,7 @@ import sys
 import time
 from datetime import timedelta
 
+import gym
 import optuna
 from gym import Env
 from optuna.visualization import plot_optimization_history, plot_param_importances
@@ -18,7 +19,6 @@ from stable_baselines3.common.logger import Logger, configure
 from stable_baselines3.common.monitor import Monitor
 
 import stay_awake
-from aircraft_carrier_scenario_env import AircraftCarrierScenarioEnv
 from trial_eval_callback import TrialEvalCallback
 
 
@@ -63,7 +63,7 @@ def agent_objective(trial: optuna.Trial) -> int:
     :rtype: int
     """
     # Create the gym model
-    gym_env: Env = AircraftCarrierScenarioEnv()
+    gym_env: Env = gym.make("ACS-v0")
     eval_env = Monitor(gym_env)
 
     # Determine the hyperparameters
@@ -229,7 +229,7 @@ def test_agent(model, env: Env):
 
 def perform_agent_training(logger: Logger):
     # Parallel Environments
-    env = make_vec_env(AircraftCarrierScenarioEnv, n_envs=4)
+    env = make_vec_env("ACS-v0", n_envs=4)
 
     try:
         model = PPO.load("models/best_model", env)
@@ -239,7 +239,7 @@ def perform_agent_training(logger: Logger):
 
     if model is None:
         logger.log("No existing model. Creating a new model to learn with")
-        model = PPO("MlpPolicy", env)
+        model = PPO("MultiInputPolicy", env)
     else:
         logger.log("Existing model found. Will continue its learning")
 
@@ -247,7 +247,7 @@ def perform_agent_training(logger: Logger):
 
     # Set callbacks
     # Separate evaluation environment
-    eval_env = Monitor(AircraftCarrierScenarioEnv())
+    eval_env = Monitor(gym.make("ACS-v0"))
     callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=10, verbose=1)
     eval_callback = EvalCallback(eval_env=eval_env, callback_on_new_best=callback_on_best,
                                  best_model_save_path="models", verbose=1)
@@ -275,17 +275,17 @@ def run_agent(perform_training: bool, perform_test: bool, run_env: bool):
         model = perform_agent_training(logger)
     else:
         logger.log("Training option disabled. Loading model from file")
-        env = AircraftCarrierScenarioEnv()
+        env = gym.make("ACS-v0")
         model = PPO.load("models/best_model", env)
 
     if perform_test:
-        env = AircraftCarrierScenarioEnv()
+        env = gym.make("ACS-v0")
         model.set_env(env)
         mean_rewards, std_rewards = test_agent(model, env)
         logger.log(f"Performance: Rewards: {mean_rewards} +/- {std_rewards:.2f}")
 
     if run_env:
-        env = AircraftCarrierScenarioEnv()
+        env = gym.make("ACS-v0")
         model.set_env(env)
         state = env.reset()
         done = False
