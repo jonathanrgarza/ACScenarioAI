@@ -286,7 +286,7 @@ def perform_agent_training(logger: Logger):
 
     if model is None:
         logger.log("No existing model. Creating a new model to learn with")
-        get_new_ppo_agent(env, "models/logging", True)
+        model = get_new_ppo_agent(env, "models/logging", True)
     else:
         logger.log("Existing model found. Will continue its learning")
 
@@ -295,7 +295,8 @@ def perform_agent_training(logger: Logger):
     # Set callbacks
     # Separate evaluation environment
     eval_env = Monitor(gym.make("ACS-v0"))
-    callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=10, verbose=1)
+    # callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=10, verbose=1)
+    callback_on_best = None
     eval_callback = EvalCallback(eval_env=eval_env, callback_on_new_best=callback_on_best,
                                  best_model_save_path="models", verbose=1)
     with stay_awake.keep_awake():
@@ -369,6 +370,6 @@ RENDER_ENV = False
 
 if __name__ == "__main__":
     start_time = time.time()
-    perform_optuna_optimizing()
-    # run_agent(PERFORM_TRAINING, PERFORM_TESTING, RENDER_ENV)
+    # perform_optuna_optimizing()
+    run_agent(PERFORM_TRAINING, PERFORM_TESTING, RENDER_ENV)
     print(f"Finished program. Execution time: {timedelta(seconds=(time.time() - start_time))}")
