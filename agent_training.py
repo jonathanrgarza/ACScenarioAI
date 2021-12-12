@@ -6,6 +6,7 @@ import os
 import sys
 import time
 from datetime import timedelta
+from typing import Optional, Union
 
 import gym
 import optuna
@@ -17,6 +18,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import Logger, configure
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import VecEnv
 
 import stay_awake
 from trial_eval_callback import TrialEvalCallback
@@ -77,23 +79,20 @@ def agent_objective(trial: optuna.Trial) -> int:
     policy = "MultiInputPolicy"
 
     # Get trial's hyperparameters that are common to all algorithms
-    # learning_rate = trial.suggest_float("learning_rate", 0, 1)
     learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1)
     n_steps = trial.suggest_categorical("n_steps", [8, 16, 32, 64, 128, 256, 512, 1024, 2048])
     gamma = trial.suggest_categorical("gamma", [0.9, 0.95, 0.98, 0.99, 0.995, 0.999, 0.9999])
+    ent_coef = trial.suggest_loguniform("ent_coef", 0.00000001, 0.1)
+    vf_coef = trial.suggest_uniform("vf_coef", 0, 1)
+    gae_lambda = trial.suggest_categorical("gae_lambda", [0.8, 0.9, 0.92, 0.95, 0.98, 0.99, 1.0])
+    max_grad_norm = trial.suggest_categorical("max_grad_norm", [0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 5])
 
     # Launch tensorboard with command: tensorboard --logdir=models/optuna/logging
 
     if algorithm == "PPO":
         # Get trial's hyperparameters that are for PPO algorithm only
-        # n_steps = trial.suggest_int("n_steps", 2, 2048 * 5)
-
-        ent_coef = trial.suggest_loguniform("ent_coef", 0.00000001, 0.1)
         clip_range = trial.suggest_categorical("clip_range", [0.1, 0.2, 0.3, 0.4])
         n_epochs = trial.suggest_categorical("n_epochs", [1, 5, 10, 20])
-        gae_lambda = trial.suggest_categorical("gae_lambda", [0.8, 0.9, 0.92, 0.95, 0.98, 0.99, 1.0])
-        max_grad_norm = trial.suggest_categorical("max_grad_norm", [0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 5])
-        vf_coef = trial.suggest_uniform("vf_coef", 0, 1)
 
         # Suggestion: factors of n_steps * n_envs (number of environments (parallel))
         # batch_size = trial.suggest_categorical("batch_size", factors(n_steps))
@@ -116,22 +115,26 @@ def agent_objective(trial: optuna.Trial) -> int:
         model = PPO(policy, eval_env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps, n_epochs=n_epochs,
                     batch_size=batch_size, ent_coef=ent_coef, clip_range=clip_range,
                     gae_lambda=gae_lambda, max_grad_norm=max_grad_norm, vf_coef=vf_coef,
-                    tensorboard_log="models/optuna/logging", verbose=1)
+                    tensorboard_log="models/optuna/logging", verbose=0)
     elif algorithm == "A2C":
-        # Get trial's hyperparameters that are for PPO algorithm only
-        # n_steps = trial.suggest_int("n_steps", 1, 5 * 5)
+        # Get trial's hyperparameters that are for A2C algorithm only
+        normalize_advantage = trial.suggest_categorical("normalize_advantage", [False, True])
+        # Toggle PyTorch RMS Prop (different from TF one, cf doc)
+        use_rms_prop = trial.suggest_categorical("use_rms_prop", [False, True])
 
-        model = A2C(policy, eval_env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps,
-                    tensorboard_log="models/optuna/logging", verbose=1)
+        model = A2C(policy, eval_env, learning_rate=learning_rate, n_steps=n_steps, gamma=gamma, gae_lambda=gae_lambda,
+                    ent_coef=ent_coef, vf_coef=vf_coef, max_grad_norm=max_grad_norm, use_rms_prop=use_rms_prop,
+                    normalize_advantage=normalize_advantage,
+                    tensorboard_log="models/optuna/logging", verbose=0)
     else:
         raise ValueError(f"Invalid algorithm selected: {algorithm}")
 
-    eval_callback = TrialEvalCallback(eval_env, trial, verbose=1)
+    eval_callback = TrialEvalCallback(eval_env, trial, verbose=0)
 
     try:
         # No keep awake needed here as this is called by optuna which has been kept awake
         print(f"Starting a trial '{trial.number}' using the '{algorithm}' algorithm")
-        model.learn(25000, callback=eval_callback)
+        model.learn(25000 * 5, callback=eval_callback)
 
         model.env.close()
         eval_env.close()
@@ -158,7 +161,7 @@ def agent_objective(trial: optuna.Trial) -> int:
     return reward
 
 
-def perform_optuna_optimizing():
+def perform_optuna_optimizing(n_trials: int = 100):
     print("Initializing an optuna hyperparameter optimization study run")
 
     # Create dir if needed
@@ -173,32 +176,30 @@ def perform_optuna_optimizing():
     log_handler = logging.StreamHandler(sys.stdout)
     log_handler.setFormatter(logging.Formatter("[%(asctime)s] %(message)s"))
     logger.addHandler(log_handler)
-    study_name = "agent_study_1"  # Unique identifier of the study
+    study_name = "agent_study_2"  # Unique identifier of the study
     storage_name = f"sqlite:///models/optuna/{study_name}.db"
     study = optuna.create_study(study_name=study_name, storage=storage_name, direction="maximize", load_if_exists=True)
 
-    n_trials = 100
     completed = False
 
     try:
         with stay_awake.keep_awake():
-            print("Starting an optuna hyperparameter optimization run")
+            logger.info("Starting an optuna hyperparameter optimization run")
             study.optimize(agent_objective, n_trials=n_trials)
             completed = True
     except KeyboardInterrupt:
         pass
 
-    print("Number of finished trials: ", len(study.trials))
+    logger.info("Number of finished trials: ", len(study.trials))
 
-    print("Best trial:")
     trial = study.best_trial
-    print(f"Best trial: {trial.number}")
+    logger.info(f"Best trial: {trial.number}")
 
-    print("Value: ", trial.value)
+    logger.info("Value: ", trial.value)
 
-    print("Params: ")
+    logger.info("Params: ")
     for key, value in trial.params.items():
-        print(f"    {key}: {value}")
+        logger.info(f"    {key}: {value}")
 
     if completed:
         completed_str = "Completed"
@@ -212,7 +213,7 @@ def perform_optuna_optimizing():
 
     log_path = os.path.join("models", "optuna", report_name)
 
-    print(f"Writing report to {log_path}")
+    logger.info(f"Writing report to {log_path}")
 
     # Write report
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
@@ -225,14 +226,52 @@ def perform_optuna_optimizing():
 
         fig1.show()
         fig2.show()
-    except (ValueError, ImportError, RuntimeError):
-        pass
+    except (ValueError, ImportError, RuntimeError) as e:
+        logger.warning(f"Could not plot study: {e}")
 
 
 def test_agent(model, env: Env):
     monitored_env = Monitor(env)
     model.set_env(monitored_env)
     return evaluate_policy(model, monitored_env, n_eval_episodes=10)
+
+
+def get_new_ppo_agent(env: Union[Env, VecEnv, str],
+                      tensorboard_log: Optional[str] = None, verbose: bool = False) -> PPO:
+    """
+    Gets a new PPO agent for the given environment. This is meant only for the AC Carrier Scenario.
+
+    :param env: The gym environment.
+    :param tensorboard_log: The tensorboard log location. Default is None.
+    :param verbose: The verbose setting. Default is False.
+    :return: The PPO agent.
+    """
+    if env is None:
+        raise ValueError("The env is not set")
+
+    policy = "MultiInputPolicy"  # This policy is required for Dict type of environments
+
+    # Set the best hyperparams found
+    learning_rate = 0.005414873093748744
+    n_steps = 256
+    gamma = 0.9
+    ent_coef = 1.992566725293565e-05
+    clip_range = 0.4
+    n_epochs = 20
+    gae_lambda = 0.98
+    max_grad_norm = 0.9
+    vf_coef = 0.3900021887374706
+    batch_size = 128
+
+    verbose_int = 0
+    if verbose:
+        verbose_int = 1
+
+    model = PPO(policy, env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps, n_epochs=n_epochs,
+                batch_size=batch_size, ent_coef=ent_coef, clip_range=clip_range,
+                gae_lambda=gae_lambda, max_grad_norm=max_grad_norm, vf_coef=vf_coef,
+                tensorboard_log=tensorboard_log, verbose=verbose_int)
+    return model
 
 
 def perform_agent_training(logger: Logger):
@@ -247,7 +286,7 @@ def perform_agent_training(logger: Logger):
 
     if model is None:
         logger.log("No existing model. Creating a new model to learn with")
-        model = PPO("MultiInputPolicy", env)
+        get_new_ppo_agent(env, "models/logging", True)
     else:
         logger.log("Existing model found. Will continue its learning")
 
@@ -260,7 +299,7 @@ def perform_agent_training(logger: Logger):
     eval_callback = EvalCallback(eval_env=eval_env, callback_on_new_best=callback_on_best,
                                  best_model_save_path="models", verbose=1)
     with stay_awake.keep_awake():
-        model.learn(total_timesteps=25000, callback=eval_callback)
+        model.learn(total_timesteps=25000 * 10, callback=eval_callback)
 
     model.save("trained_model")
     env.close()
