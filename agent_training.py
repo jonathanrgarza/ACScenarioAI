@@ -251,7 +251,7 @@ def get_new_ppo_agent(env: Union[Env, VecEnv, str],
 
     policy = "MultiInputPolicy"  # This policy is required for Dict type of environments
 
-    # Set the best hyperparams found
+    # Set the best hyperparams found; value reached for these parameters: 1744
     learning_rate = 0.005414873093748744
     n_steps = 256
     gamma = 0.9
