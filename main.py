@@ -1,7 +1,7 @@
 import time
 from datetime import timedelta
 
-from agent_training import perform_optuna_optimizing, run_agent
+from ac_carrier_scenario.ai.agent_training import run_agent
 
 if __name__ == "__main__":
     start_time = time.time()

@@ -20,12 +20,11 @@ from stable_baselines3.common.logger import Logger, configure
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import VecEnv
 
-import stay_awake
-from trial_eval_callback import TrialEvalCallback
+import ac_carrier_scenario.util.stay_awake as stay_awake
+from ac_carrier_scenario.ai.trial_eval_callback import TrialEvalCallback
 
 # Import the custom env
-# noinspection PyUnresolvedReferences
-from ac_carrier_scenario.environment import AircraftCarrierScenarioEnv  # pytype: disable=import-error
+import ac_carrier_scenario.common  # This is required to register the gym environment
 
 
 def clear_console() -> None:

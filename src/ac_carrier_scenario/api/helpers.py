@@ -1,6 +1,7 @@
 from typing import Optional
 
-from ac_carrier_scenario.scenarios import AircraftCarrierScenario
+from ac_carrier_scenario.common.scenarios import AircraftCarrierScenario
+
 
 def get_scenario_from_json(json: dict) -> Optional[AircraftCarrierScenario]:
     if json is not dict:
@@ -35,8 +36,11 @@ def get_scenario_from_json(json: dict) -> Optional[AircraftCarrierScenario]:
     target6_expected_damage: int = int(json["target6_expected_damage"])
 
     # Create AircraftCarrierScenario from json values
-    scenario = AircraftCarrierScenario(missile_count: missile_count, jet_count: jet_count, pilot_count: pilot_count,
-    target1_expected_damage: target1_expected_damage, target2_expected_damage: target2_expected_damage,
-    target3_expected_damage: target3_expected_damage, target4_expected_damage: target4_expected_damage,
-    target5_expected_damage: target5_expected_damage, target6_expected_damage: target6_expected_damage)
+    scenario = AircraftCarrierScenario(missile_count=missile_count, jet_count=jet_count, pilot_count=pilot_count,
+                                       target1_expected_damage=target1_expected_damage,
+                                       target2_expected_damage=target2_expected_damage,
+                                       target3_expected_damage=target3_expected_damage,
+                                       target4_expected_damage=target4_expected_damage,
+                                       target5_expected_damage=target5_expected_damage,
+                                       target6_expected_damage=target6_expected_damage)
     return scenario
