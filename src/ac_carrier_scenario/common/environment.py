@@ -62,10 +62,36 @@ def _get_randomized_state() -> dict:
     :return: The new initial state for AircraftCarrierScenarioEn
     :rtype: dict
     """
+    target1_expected_damage = random.randint(0, 4)
+    target2_expected_damage = random.randint(0, 4)
+    target3_expected_damage = random.randint(0, 4)
+    target4_expected_damage = random.randint(0, 4)
+    target5_expected_damage = random.randint(0, 4)
+    target6_expected_damage = random.randint(0, 4)
+
+    # Check to make sure there not all zero
+    if (target1_expected_damage == 0 and target2_expected_damage == 0 and target3_expected_damage == 0 and
+            target4_expected_damage == 0 and target5_expected_damage == 0 and target6_expected_damage == 0):
+        # All values are zero, make one of them more than 0
+        new_value = 2
+        random_target = random.randint(1, 6)
+        if random_target == 1:
+            target1_expected_damage = new_value
+        elif random_target == 2:
+            target2_expected_damage = new_value
+        elif random_target == 3:
+            target3_expected_damage = new_value
+        elif random_target == 4:
+            target4_expected_damage = new_value
+        elif random_target == 5:
+            target5_expected_damage = new_value
+        elif random_target == 6:
+            target6_expected_damage = new_value
+
     scenario = AircraftCarrierScenario(
         random.randint(1, 99), random.randint(1, 99), random.randint(1, 99),
-        random.randint(0, 4), random.randint(0, 4), random.randint(0, 4),
-        random.randint(0, 4), random.randint(0, 4), random.randint(0, 4))
+        target1_expected_damage, target2_expected_damage, target3_expected_damage,
+        target4_expected_damage, target5_expected_damage, target6_expected_damage)
     return _get_init_state(scenario)
 
 
@@ -73,6 +99,7 @@ class AircraftCarrierScenarioEnv(Env):
     """
     Environment representing a random aircraft carrier scenario.
     """
+
     def __init__(self) -> None:
         self.action_space = MultiDiscrete([6, 6, 2, 2])
         self.observation_space = Dict(
@@ -277,6 +304,7 @@ class SpecificAircraftCarrierScenarioEnv(AircraftCarrierScenarioEnv):
     """
     Environment representing a specific, non-random, aircraft carrier scenario.
     """
+
     def __init__(self, scenario: AircraftCarrierScenario) -> None:
         super().__init__()
 

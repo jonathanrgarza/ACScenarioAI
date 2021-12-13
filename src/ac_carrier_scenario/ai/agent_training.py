@@ -11,6 +11,7 @@ from typing import Optional, Union
 import gym
 import optuna
 from gym import Env
+from gym.wrappers import TimeLimit
 from optuna.visualization import plot_optimization_history, plot_param_importances
 from stable_baselines3 import PPO, A2C
 from stable_baselines3.common.callbacks import EvalCallback
@@ -22,7 +23,8 @@ from stable_baselines3.common.vec_env import VecEnv
 
 # Import the custom env
 # noinspection PyUnresolvedReferences
-import ac_carrier_scenario.common  # This is required to register the gym environment
+from ac_carrier_scenario.common.scenarios import AircraftCarrierScenario
+from ac_carrier_scenario.common.environment import SpecificAircraftCarrierScenarioEnv
 import ac_carrier_scenario.util.stay_awake as stay_awake
 from ac_carrier_scenario.ai.trial_eval_callback import TrialEvalCallback
 
@@ -57,6 +59,21 @@ def factors(n: int) -> list[int]:
     factor_list = list(dict.fromkeys(factor_list))  # Get only unique entries
     factor_list.sort()
     return factor_list
+
+
+def get_ideal_scenario_env() -> Env:
+    """
+    Gets the ideal scenario gym environment.
+    :return: The ideal scenario environment.
+    """
+    scenario = AircraftCarrierScenario(missile_count=13, jet_count=19, pilot_count=21,
+                                       target1_expected_damage=4, target2_expected_damage=2,
+                                       target3_expected_damage=2, target4_expected_damage=2,
+                                       target5_expected_damage=0, target6_expected_damage=0)
+
+    env: SpecificAircraftCarrierScenarioEnv = SpecificAircraftCarrierScenarioEnv(scenario=scenario)
+    wrapped_env: Env = TimeLimit(env, max_episode_steps=250)
+    return wrapped_env
 
 
 def agent_objective(trial: optuna.Trial) -> int:
@@ -229,10 +246,14 @@ def perform_optuna_optimizing(n_trials: int = 100):
         logger.warning(f"Could not plot study: {e}")
 
 
-def test_agent(model, env: Env):
-    monitored_env = Monitor(env)
+def test_agent(model, env: Union[Env, Monitor, VecEnv], n_eval_episodes: int = 10):
+    if isinstance(env, Monitor) or isinstance(env, VecEnv):
+        monitored_env = env
+    else:
+        monitored_env = Monitor(env)
+
     model.set_env(monitored_env)
-    return evaluate_policy(model, monitored_env, n_eval_episodes=10)
+    return evaluate_policy(model, monitored_env, n_eval_episodes=n_eval_episodes)
 
 
 def get_new_ppo_agent(env: Union[Env, VecEnv, str],
@@ -309,12 +330,12 @@ def perform_agent_training(logger: Logger):
 
 
 def run_agent(perform_training: bool, perform_test: bool, run_env: bool):
-    print("Running stable_baselines3 PPO agent learning")
+    print("Running stable_baselines3 PPO agent")
 
     # Init logger
     logger = configure(None, ["stdout"])
 
-    if not perform_training and not run_env:
+    if not perform_training and not perform_test and not run_env:
         logger.log("No action to perform, please update script/program and run again")
         return
 
@@ -322,24 +343,29 @@ def run_agent(perform_training: bool, perform_test: bool, run_env: bool):
         model = perform_agent_training(logger)
     else:
         logger.log("Training option disabled. Loading model from file")
-        env = gym.make("ACS-v0")
+        env = make_vec_env("ACS-v0")
         model = PPO.load("models/best_model", env)
 
     if perform_test:
-        env = gym.make("ACS-v0")
+        env = make_vec_env("ACS-v0")
         model.set_env(env)
-        mean_rewards, std_rewards = test_agent(model, env)
-        logger.log(f"Performance: Rewards: {mean_rewards} +/- {std_rewards:.2f}")
+        mean_rewards, std_rewards = test_agent(model, env, n_eval_episodes=10)
+        logger.log(f"Random Performance: Rewards: {mean_rewards} +/- {std_rewards:.2f}")
+
+        env = Monitor(get_ideal_scenario_env())
+        model.set_env(env)
+        mean_rewards, std_rewards = test_agent(model, env, n_eval_episodes=10)
+        logger.log(f"Ideal Performance: Rewards: {mean_rewards} +/- {std_rewards:.2f}")
 
     if run_env:
-        env = gym.make("ACS-v0")
+        env = Monitor(get_ideal_scenario_env())
         model.set_env(env)
         state = env.reset()
         done = False
 
         reward_score = 0
         steps = 0
-        for _ in range(250):
+        for _ in range(251):
             action, _states = model.predict(state)
             new_state, reward, done, info = env.step(action)
             state = new_state
@@ -349,7 +375,8 @@ def run_agent(perform_training: bool, perform_test: bool, run_env: bool):
 
             # clear_console()
             # env.render()
-            logger.log(f"Step#: {steps}, Reward: {reward}")
+            logger.log(f"Step#: {steps}, Reward: {reward}, Action: {action}, currentShipDamage: "
+                       f"{state['currentShipDamage']}, missiles: {state['missiles']}")
             time.sleep(0.3)
 
             if done:
@@ -359,16 +386,23 @@ def run_agent(perform_training: bool, perform_test: bool, run_env: bool):
         if not done:
             logger.log("Agent could not complete the environment")
 
+        ideal_env: SpecificAircraftCarrierScenarioEnv = env.unwrapped
+        if ideal_env.is_expected_damage_met:
+            logger.log("Agent met expected damage requirements")
+        else:
+            logger.log("Agent FAILED to meet expected damage requirements")
+            logger.log(f"Env: {state}")
+
         env.close()
         logger.log("Run complete")
 
 
 PERFORM_TRAINING = True
 PERFORM_TESTING = True
-RENDER_ENV = False
+RUN_ENV = False
 
 if __name__ == "__main__":
     start_time = time.time()
     # perform_optuna_optimizing()
-    run_agent(PERFORM_TRAINING, PERFORM_TESTING, RENDER_ENV)
+    run_agent(PERFORM_TRAINING, PERFORM_TESTING, RUN_ENV)
     print(f"Finished program. Execution time: {timedelta(seconds=(time.time() - start_time))}")
