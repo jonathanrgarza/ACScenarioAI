@@ -3,7 +3,6 @@ Module for training the AI agent.
 """
 import logging
 import os
-import sys
 import time
 from datetime import timedelta
 from typing import Optional, Union
@@ -76,7 +75,7 @@ def get_ideal_scenario_env() -> Env:
     return wrapped_env
 
 
-_optuna_logger: Logger  # Logger for optuna studies
+_optuna_logger: logging.Logger  # Logger for optuna studies
 
 
 def agent_objective(trial: optuna.Trial) -> int:
@@ -90,8 +89,8 @@ def agent_objective(trial: optuna.Trial) -> int:
     global _optuna_logger
 
     # Create the gym model
-    gym_env: Env = gym.make("ACS-v0")
-    monitored_env = Monitor(gym_env)
+    # gym_env: Env = gym.make("ACS-v0")
+    monitored_env = make_vec_env("ACS-v0", n_envs=6)
 
     # eval_env = Monitor(gym.make("ACS-v0"))
     eval_env = Monitor(get_ideal_scenario_env())
@@ -136,8 +135,8 @@ def agent_objective(trial: optuna.Trial) -> int:
         if batch_size > n_steps:
             batch_size = n_steps
 
-        model = PPO(policy, monitored_env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps, n_epochs=n_epochs,
-                    batch_size=batch_size, ent_coef=ent_coef, clip_range=clip_range,
+        model = PPO(policy, monitored_env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps,
+                    n_epochs=n_epochs, batch_size=batch_size, ent_coef=ent_coef, clip_range=clip_range,
                     gae_lambda=gae_lambda, max_grad_norm=max_grad_norm, vf_coef=vf_coef,
                     tensorboard_log="models/optuna/logging", verbose=0)
     elif algorithm == "A2C":
@@ -146,9 +145,9 @@ def agent_objective(trial: optuna.Trial) -> int:
         # Toggle PyTorch RMS Prop (different from TF one, cf doc)
         use_rms_prop = trial.suggest_categorical("use_rms_prop", [False, True])
 
-        model = A2C(policy, monitored_env, learning_rate=learning_rate, n_steps=n_steps, gamma=gamma, gae_lambda=gae_lambda,
-                    ent_coef=ent_coef, vf_coef=vf_coef, max_grad_norm=max_grad_norm, use_rms_prop=use_rms_prop,
-                    normalize_advantage=normalize_advantage,
+        model = A2C(policy, monitored_env, learning_rate=learning_rate, n_steps=n_steps, gamma=gamma,
+                    gae_lambda=gae_lambda, ent_coef=ent_coef, vf_coef=vf_coef, max_grad_norm=max_grad_norm,
+                    use_rms_prop=use_rms_prop, normalize_advantage=normalize_advantage,
                     tensorboard_log="models/optuna/logging", verbose=0)
     else:
         raise ValueError(f"Invalid algorithm selected: {algorithm}")
@@ -218,9 +217,14 @@ def perform_optuna_optimizing(n_trials: int = 100):
     except KeyboardInterrupt:
         pass
 
+    try:
+        trial = study.best_trial
+    except ValueError:
+        _optuna_logger.warning("Could not get a best trial. Likely because no trial has ever been completed yet")
+        return
+
     _optuna_logger.info(f"Number of finished trials: {len(study.trials)}")
 
-    trial = study.best_trial
     _optuna_logger.info(f"Best trial: {trial.number}")
 
     _optuna_logger.info(f"Value: {trial.value}")
@@ -255,7 +259,7 @@ def perform_optuna_optimizing(n_trials: int = 100):
         fig1.show()
         fig2.show()
     except (ValueError, ImportError, RuntimeError) as e:
-        _optuna_logger.warn(f"Could not plot study: {e}")
+        _optuna_logger.warning(f"Could not plot study: {e}")
 
 
 def test_agent(model, env: Union[Env, Monitor, VecEnv], n_eval_episodes: int = 10):
@@ -349,7 +353,7 @@ def run_agent(perform_training: bool, perform_test: bool, run_env: bool):
     print("Running stable_baselines3 PPO agent")
 
     # Init logger
-    logger = configure(None, ["stdout"])
+    logger: Logger = configure(None, ["stdout"])
 
     if not perform_training and not perform_test and not run_env:
         logger.log("No action to perform, please update script/program and run again")
