@@ -2,8 +2,8 @@ from typing import Optional
 
 from flask import Flask, request, Response, jsonify, make_response
 
-from helpers import get_scenario_from_json, perform_analysis
-from ac_carrier_scenario.common import AircraftCarrierScenario
+from ac_carrier_scenario.api.helpers import get_scenario_from_json, perform_analysis
+from ac_carrier_scenario.common.scenarios import AircraftCarrierScenario
 
 app = Flask(__name__)
 
@@ -15,7 +15,7 @@ def index() -> Response:
     return response
 
 
-@app.route("/api/analysis", methods="POST")
+@app.route("/api/analysis", methods=["POST"])
 def analysis() -> Response:
     content_json: Optional[dict] = request.get_json()
 
@@ -57,7 +57,7 @@ def analysis() -> Response:
     return response
 
 
-@app.route("/api/performance", methods="POST")
+@app.route("/api/performance", methods=["POST"])
 def performance() -> Response:
 
     # Make response
@@ -67,4 +67,4 @@ def performance() -> Response:
 
 
 if __name__ == "__main__":
-    app.run()
+    run_app()

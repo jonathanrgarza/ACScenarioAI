@@ -3,6 +3,7 @@ from typing import Optional
 import numpy as np
 import gym
 from gym.wrappers import TimeLimit
+from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.monitor import Monitor
