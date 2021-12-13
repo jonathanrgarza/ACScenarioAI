@@ -67,15 +67,20 @@ def perform_analysis(scenario: AircraftCarrierScenario) -> Optional[dict]:
         return None
 
     monitored_env: Monitor = Monitor(env)
-    mean_solves, mean_rewards, std_rewards = _get_analysis(model, monitored_env, n_eval_episodes=10)
+    mean_solves, mean_episode_length, mean_rewards, std_rewards = _get_analysis(
+        model, monitored_env, n_eval_episodes=10)
 
-    return {"mean_solves": mean_solves, "mean_rewards": mean_rewards, "std_rewards": std_rewards}
+    return {
+        "mean_solves": mean_solves, "mean_episode_length": mean_episode_length,
+        "mean_rewards": mean_rewards, "std_rewards": std_rewards
+    }
 
 
 def _get_analysis(model: OnPolicyAlgorithm, monitored_env: Monitor,
-                  n_eval_episodes: int = 10) -> tuple[float, float, float]:
+                  n_eval_episodes: int = 10) -> tuple[float, float, float, float]:
     solved_env_count: int = 0
     rewards: list[float] = []
+    step_lengths: list[int] = []
 
     if n_eval_episodes < 1:
         raise ValueError("n_eval_episodes can not be less than 1")
@@ -86,6 +91,7 @@ def _get_analysis(model: OnPolicyAlgorithm, monitored_env: Monitor,
 
         reward_score = 0
         steps = 0
+        # Run the episode til completion
         for _ in range(256):
             action, _states = model.predict(state)
             new_state, reward, done, info = monitored_env.step(action)
@@ -97,16 +103,22 @@ def _get_analysis(model: OnPolicyAlgorithm, monitored_env: Monitor,
             if done:
                 break
 
+        # Add results from episode to overall results
         env: SpecificAircraftCarrierScenarioEnv = monitored_env.unwrapped
         if done and env.is_expected_damage_met:
             solved_env_count += 1
 
         rewards.append(reward_score)
+        step_lengths.append(steps)
 
-        # noinspection PyTypeChecker
-        mean_rewards: float = np.mean(rewards)
-        # noinspection PyTypeChecker
-        std_rewards: float = np.std(rewards)
-        mean_solved_envs: float = solved_env_count / n_eval_episodes
+    # Determine statistic results of overall results
 
-        return mean_solved_envs, mean_rewards, std_rewards
+    mean_solved_envs: float = solved_env_count / n_eval_episodes
+    # noinspection PyTypeChecker
+    mean_episode_length: float = np.mean(step_lengths)
+    # noinspection PyTypeChecker
+    mean_rewards: float = np.mean(rewards)
+    # noinspection PyTypeChecker
+    std_rewards: float = np.std(rewards)
+
+    return mean_solved_envs, mean_episode_length, mean_rewards, std_rewards

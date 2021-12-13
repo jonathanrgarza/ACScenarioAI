@@ -1,0 +1,226 @@
+POST http://localhost:5000/api/analysis
+Content-Type: application/json
+
+{
+  "missile_count": 13,
+  "jet_count": 19,
+  "pilot_count": 21,
+  "target1_expected_damage": 4,
+  "target2_expected_damage": 2,
+  "target3_expected_damage": 2,
+  "target4_expected_damage": 2,
+  "target5_expected_damage": 0,
+  "target6_expected_damage": 0
+}
+
+<> 2021-12-13T005442.200.json
+
+###
+
+POST http://localhost:5000/api/analysis
+Content-Type: application/json
+
+{
+  "missile_count": 13,
+  "jet_count": 19,
+  "pilot_count": 21,
+  "target1_expected_damage": 4,
+  "target2_expected_damage": 2,
+  "target3_expected_damage": 2,
+  "target4_expected_damage": 2,
+  "target5_expected_damage": 0,
+  "target6_expected_damage": 0
+}
+
+<> 2021-12-13T005440.200.json
+
+###
+
+POST http://localhost:5000/api/analysis
+Content-Type: application/json
+
+{
+  "missile_count": 13,
+  "jet_count": 19,
+  "pilot_count": 21,
+  "target1_expected_damage": 4,
+  "target2_expected_damage": 2,
+  "target3_expected_damage": 2,
+  "target4_expected_damage": 2,
+  "target5_expected_damage": 0,
+  "target6_expected_damage": 0
+}
+
+<> 2021-12-13T005437.200.json
+
+###
+
+POST http://localhost:5000/api/analysis
+Content-Type: application/json
+
+{
+  "missile_count": 13,
+  "jet_count": 19,
+  "pilot_count": 21,
+  "target1_expected_damage": 4,
+  "target2_expected_damage": 2,
+  "target3_expected_damage": 2,
+  "target4_expected_damage": 2,
+  "target5_expected_damage": 0,
+  "target6_expected_damage": 0
+}
+
+<> 2021-12-13T005412.200.json
+
+###
+
+POST http://localhost:5000/api/analysis
+Content-Type: application/json
+
+{
+  "missile_count": 13,
+  "jet_count": 19,
+  "pilot_count": 21,
+  "target1_expected_damage": 4,
+  "target2_expected_damage": 2,
+  "target3_expected_damage": 2,
+  "target4_expected_damage": 2,
+  "target5_expected_damage": 0,
+  "target6_expected_damage": 0
+}
+
+<> 2021-12-13T004658.200.json
+
+###
+
+POST http://localhost:5000/api/analysis
+Content-Type: application/json
+
+{
+  "missile_count": 13,
+  "jet_count": 19,
+  "pilot_count": 21,
+  "target1_expected_damage": 4,
+  "target2_expected_damage": 2,
+  "target3_expected_damage": 2,
+  "target4_expected_damage": 2,
+  "target5_expected_damage": 0,
+  "target6_expected_damage": 0
+}
+
+<> 2021-12-13T004540.200.json
+
+###
+
+POST http://localhost:5000/api/analysis
+Content-Type: application/json
+
+{
+  "missile_count": 13,
+  "jet_count": 19,
+  "pilot_count": 21,
+  "target1_expected_damage": 4,
+  "target2_expected_damage": 2,
+  "target3_expected_damage": 2,
+  "target4_expected_damage": 2,
+  "target5_expected_damage": 0,
+  "target6_expected_damage": 0
+}
+
+###
+
+POST http://localhost:5000/api/analysis
+Content-Type: application/json
+
+{
+  "missile_count": 13,
+  "jet_count": 19,
+  "pilot_count": 21,
+  "target1_expected_damage": 4,
+  "target2_expected_damage": 2,
+  "target3_expected_damage": 2,
+  "target4_expected_damage": 2,
+  "target5_expected_damage": 0,
+  "target6_expected_damage": 0
+}
+
+<> 2021-12-13T003908.500.html
+
+###
+
+POST http://localhost:5000/api/analysis
+Content-Type: application/json
+
+{
+  "missile_count": 13,
+  "jet_count": 19,
+  "pilot_count": 21,
+  "target1_expected_damage": 4,
+  "target2_expected_damage": 2,
+  "target3_expected_damage": 2,
+  "target4_expected_damage": 2,
+  "target5_expected_damage": 0,
+  "target6_expected_damage": 0
+}
+
+<> 2021-12-13T003813.500.html
+
+###
+
+POST http://localhost:5000/api/analysis
+Content-Type: application/json
+
+{
+  "missile_count": 13,
+  "jet_count": 19,
+  "pilot_count": 21,
+  "target1_expected_damage": 4,
+  "target2_expected_damage": 2,
+  "target3_expected_damage": 2,
+  "target4_expected_damage": 2,
+  "target5_expected_damage": 0,
+  "target6_expected_damage": 0
+}
+
+<> 2021-12-13T003528.500.html
+
+###
+
+POST http://localhost:5000/api/analysis
+Content-Type: application/json
+
+{
+  "missile_count": 13,
+  "jet_count": 19,
+  "pilot_count": 21,
+  "target1_expected_damage": 4,
+  "target2_expected_damage": 2,
+  "target3_expected_damage": 2,
+  "target4_expected_damage": 2,
+  "target5_expected_damage": 0,
+  "target6_expected_damage": 0
+}
+
+<> 2021-12-13T003428.500.html
+
+###
+
+POST http://localhost:5000/api/analysis
+Content-Type: application/json
+
+{
+  "missile_count": 13,
+  "jet_count": 19,
+  "pilot_count": 21,
+  "target1_expected_damage": 4,
+  "target2_expected_damage": 2,
+  "target3_expected_damage": 2,
+  "target4_expected_damage": 2,
+  "target5_expected_damage": 0,
+  "target6_expected_damage": 0
+}
+
+<> 2021-12-13T003038.400.json
+
+###
+
