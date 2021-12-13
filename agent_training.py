@@ -300,9 +300,9 @@ def perform_agent_training(logger: Logger):
     eval_callback = EvalCallback(eval_env=eval_env, callback_on_new_best=callback_on_best,
                                  best_model_save_path="models", verbose=1)
     with stay_awake.keep_awake():
-        model.learn(total_timesteps=25000 * 10, callback=eval_callback)
+        model.learn(total_timesteps=25000 * 200, callback=eval_callback)
 
-    model.save("trained_model")
+    model.save("models/trained_model")
     env.close()
     logger.log("Training complete")
 
