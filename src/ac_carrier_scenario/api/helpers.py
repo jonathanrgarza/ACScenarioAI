@@ -13,6 +13,9 @@ from ac_carrier_scenario.common.environment import SpecificAircraftCarrierScenar
 from ac_carrier_scenario.common.scenarios import AircraftCarrierScenario
 
 
+MODEL_PATH = "models/best_model"
+
+
 def get_scenario_from_json(json: dict) -> Optional[AircraftCarrierScenario]:
     if not isinstance(json, dict):
         return None
@@ -63,7 +66,7 @@ def perform_analysis(scenario: AircraftCarrierScenario) -> Optional[dict]:
 
     # Load the agent/model
     try:
-        model = PPO.load("models/trained_model_more", env)
+        model = PPO.load(MODEL_PATH, env)
     except FileNotFoundError:
         return None
 
@@ -134,7 +137,7 @@ def get_performance_stats(scenario: AircraftCarrierScenario) -> Optional[dict]:
 
     # Load the agent/model
     try:
-        model = PPO.load("models/trained_model_more", env)
+        model = PPO.load(MODEL_PATH, env)
     except FileNotFoundError:
         return None
 
