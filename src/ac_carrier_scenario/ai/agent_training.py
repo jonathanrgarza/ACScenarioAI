@@ -76,6 +76,9 @@ def get_ideal_scenario_env() -> Env:
     return wrapped_env
 
 
+_optuna_logger: Logger  # Logger for optuna studies
+
+
 def agent_objective(trial: optuna.Trial) -> int:
     """
     Function to use with optuna to tune hyperparameters for ACS environment.
@@ -84,9 +87,14 @@ def agent_objective(trial: optuna.Trial) -> int:
     :return: The mean reward for the trial
     :rtype: int
     """
+    global _optuna_logger
+
     # Create the gym model
     gym_env: Env = gym.make("ACS-v0")
-    eval_env = Monitor(gym_env)
+    monitored_env = Monitor(gym_env)
+
+    # eval_env = Monitor(gym.make("ACS-v0"))
+    eval_env = Monitor(get_ideal_scenario_env())
 
     # Determine the hyperparameters
     # algorithm = trial.suggest_categorical("algorithm", ["PPO", "A2C"])
@@ -128,7 +136,7 @@ def agent_objective(trial: optuna.Trial) -> int:
         if batch_size > n_steps:
             batch_size = n_steps
 
-        model = PPO(policy, eval_env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps, n_epochs=n_epochs,
+        model = PPO(policy, monitored_env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps, n_epochs=n_epochs,
                     batch_size=batch_size, ent_coef=ent_coef, clip_range=clip_range,
                     gae_lambda=gae_lambda, max_grad_norm=max_grad_norm, vf_coef=vf_coef,
                     tensorboard_log="models/optuna/logging", verbose=0)
@@ -138,18 +146,19 @@ def agent_objective(trial: optuna.Trial) -> int:
         # Toggle PyTorch RMS Prop (different from TF one, cf doc)
         use_rms_prop = trial.suggest_categorical("use_rms_prop", [False, True])
 
-        model = A2C(policy, eval_env, learning_rate=learning_rate, n_steps=n_steps, gamma=gamma, gae_lambda=gae_lambda,
+        model = A2C(policy, monitored_env, learning_rate=learning_rate, n_steps=n_steps, gamma=gamma, gae_lambda=gae_lambda,
                     ent_coef=ent_coef, vf_coef=vf_coef, max_grad_norm=max_grad_norm, use_rms_prop=use_rms_prop,
                     normalize_advantage=normalize_advantage,
                     tensorboard_log="models/optuna/logging", verbose=0)
     else:
         raise ValueError(f"Invalid algorithm selected: {algorithm}")
 
+    # Create the evaluation callback
     eval_callback = TrialEvalCallback(eval_env, trial, verbose=0)
 
     try:
         # No keep awake needed here as this is called by optuna which has been kept awake
-        print(f"Starting a trial '{trial.number}' using the '{algorithm}' algorithm")
+        _optuna_logger.info(f"Starting a trial '{trial.number}' using the '{algorithm}' algorithm")
         model.learn(25000 * 5, callback=eval_callback)
 
         model.env.close()
@@ -159,10 +168,10 @@ def agent_objective(trial: optuna.Trial) -> int:
         model.env.close()
         eval_env.close()
         # Prune hyperparameters that generate NaNs
-        print(e)
-        print("============")
-        print("Sampled hyperparameters:")
-        print(trial.params)
+        _optuna_logger.info(e)
+        _optuna_logger.info("============")
+        _optuna_logger.info("Sampled hyperparameters:")
+        _optuna_logger.info(trial.params)
         raise optuna.exceptions.TrialPruned()
 
     is_pruned = eval_callback.is_pruned
@@ -178,20 +187,23 @@ def agent_objective(trial: optuna.Trial) -> int:
 
 
 def perform_optuna_optimizing(n_trials: int = 100):
-    print("Initializing an optuna hyperparameter optimization study run")
+    global _optuna_logger
+    # Add stream handler of stdout to show the messages
+    _optuna_logger = optuna.logging.get_logger("optuna")
+    # These are not needed as they are the default for optuna's logger
+    # log_handler = logging.StreamHandler(sys.stdout)
+    # log_handler.setFormatter(logging.Formatter("[%(asctime)s] %(message)s"))
+    # logger.addHandler(log_handler)
+
+    _optuna_logger.info("Initializing an optuna hyperparameter optimization study run")
 
     # Create dir if needed
     try:
         os.makedirs("models/optuna", exist_ok=True)
     except OSError:
-        print("Could not create folder 'models/optuna'. Create this folder first and try again.")
+        _optuna_logger.error("Could not create folder 'models/optuna'. Create this folder first and try again.")
         exit(1)
 
-    # Add stream handler of stdout to show the messages
-    logger = optuna.logging.get_logger("optuna")
-    log_handler = logging.StreamHandler(sys.stdout)
-    log_handler.setFormatter(logging.Formatter("[%(asctime)s] %(message)s"))
-    logger.addHandler(log_handler)
     study_name = "agent_study_2"  # Unique identifier of the study
     storage_name = f"sqlite:///models/optuna/{study_name}.db"
     study = optuna.create_study(study_name=study_name, storage=storage_name, direction="maximize", load_if_exists=True)
@@ -200,22 +212,22 @@ def perform_optuna_optimizing(n_trials: int = 100):
 
     try:
         with stay_awake.keep_awake():
-            logger.info("Starting an optuna hyperparameter optimization run")
+            _optuna_logger.info("Starting an optuna hyperparameter optimization run")
             study.optimize(agent_objective, n_trials=n_trials)
             completed = True
     except KeyboardInterrupt:
         pass
 
-    logger.info("Number of finished trials: ", len(study.trials))
+    _optuna_logger.info(f"Number of finished trials: {len(study.trials)}")
 
     trial = study.best_trial
-    logger.info(f"Best trial: {trial.number}")
+    _optuna_logger.info(f"Best trial: {trial.number}")
 
-    logger.info("Value: ", trial.value)
+    _optuna_logger.info(f"Value: {trial.value}")
 
-    logger.info("Params: ")
+    _optuna_logger.info("Params: ")
     for key, value in trial.params.items():
-        logger.info(f"    {key}: {value}")
+        _optuna_logger.info(f"    {key}: {value}")
 
     if completed:
         completed_str = "Completed"
@@ -223,13 +235,13 @@ def perform_optuna_optimizing(n_trials: int = 100):
         completed_str = "Uncompleted"
 
     report_name = (
-        f"report_agent_{n_trials}-trials-{25000}"
+        f"report_study-{study_name}_{n_trials}-trials-{25000}"
         f"-TPE-None_{int(time.time())}-status-{completed_str}"
     )
 
     log_path = os.path.join("models", "optuna", report_name)
 
-    logger.info(f"Writing report to {log_path}")
+    _optuna_logger.info(f"Writing report to {log_path}")
 
     # Write report
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
@@ -243,7 +255,7 @@ def perform_optuna_optimizing(n_trials: int = 100):
         fig1.show()
         fig2.show()
     except (ValueError, ImportError, RuntimeError) as e:
-        logger.warning(f"Could not plot study: {e}")
+        _optuna_logger.warn(f"Could not plot study: {e}")
 
 
 def test_agent(model, env: Union[Env, Monitor, VecEnv], n_eval_episodes: int = 10):
@@ -296,17 +308,18 @@ def get_new_ppo_agent(env: Union[Env, VecEnv, str],
 
 def perform_agent_training(logger: Logger):
     # Parallel Environments
-    env = make_vec_env("ACS-v0", n_envs=4)
+    env = make_vec_env("ACS-v0", n_envs=6)
 
     model_save_path = "models/trained_model_v2"
+    tb_log_path: Optional[str] = "models/logging"
     try:
-        model = PPO.load(model_save_path, env)
+        model = PPO.load(model_save_path, env, tensorboard_log=tb_log_path)
     except FileNotFoundError:
         model = None
 
     if model is None:
         logger.log(f"No existing model found at '{model_save_path}.zip'. Creating a new model to learn with")
-        model = get_new_ppo_agent(env, "models/logging", True)
+        model = get_new_ppo_agent(env, tb_log_path, True)
     else:
         logger.log(f"Existing model found at '{model_save_path}.zip'. Will continue its learning")
 
@@ -321,7 +334,7 @@ def perform_agent_training(logger: Logger):
                                  best_model_save_path="models", verbose=1)
     with stay_awake.keep_awake():
         try:
-            model.learn(total_timesteps=25000 * 200, callback=eval_callback)
+            model.learn(total_timesteps=25000 * 500, callback=eval_callback)
         except KeyboardInterrupt:
             pass
 
