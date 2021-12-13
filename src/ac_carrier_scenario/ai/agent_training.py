@@ -299,7 +299,7 @@ def perform_agent_training(logger: Logger):
     env = make_vec_env("ACS-v0", n_envs=4)
 
     try:
-        model = PPO.load("models/best_model", env)
+        model = PPO.load("models/trained_model_v2", env)
     except FileNotFoundError:
         model = None
         logger.log("No existing model found at models/best_model.zip")
@@ -320,9 +320,12 @@ def perform_agent_training(logger: Logger):
     eval_callback = EvalCallback(eval_env=eval_env, callback_on_new_best=callback_on_best,
                                  best_model_save_path="models", verbose=1)
     with stay_awake.keep_awake():
-        model.learn(total_timesteps=25000 * 200, callback=eval_callback)
+        try:
+            model.learn(total_timesteps=25000 * 200, callback=eval_callback)
+        except KeyboardInterrupt:
+            pass
 
-    model.save("models/trained_model")
+    model.save("models/trained_model_v2")
     env.close()
     logger.log("Training complete")
 
