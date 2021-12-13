@@ -13,7 +13,7 @@ from ac_carrier_scenario.common.environment import SpecificAircraftCarrierScenar
 
 
 def get_scenario_from_json(json: dict) -> Optional[AircraftCarrierScenario]:
-    if json is not dict:
+    if not isinstance(json, dict):
         return None
 
     if "missile_count" not in json:
@@ -93,8 +93,6 @@ def _get_analysis(model: OnPolicyAlgorithm, monitored_env: Monitor,
 
             reward_score += reward
             steps += 1
-
-            time.sleep(0.3)
 
             if done:
                 break

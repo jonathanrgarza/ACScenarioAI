@@ -95,7 +95,7 @@ class AircraftCarrierScenarioEnv(Env):
                 "jets": Discrete(100),
                 "pilots": Discrete(100)
             })
-        self.state: dict = self.reset()
+        self.state: dict = _get_randomized_state()  # Do not call reset here due to inheritance
 
     @property
     def is_expected_damage_met(self) -> bool:
@@ -280,10 +280,10 @@ class SpecificAircraftCarrierScenarioEnv(AircraftCarrierScenarioEnv):
     def __init__(self, scenario: AircraftCarrierScenario) -> None:
         super().__init__()
 
-        if scenario is not AircraftCarrierScenario:
+        if not isinstance(scenario, AircraftCarrierScenario):
             raise ValueError("scenario is not of the expected type 'AircraftCarrierScenario'")
         self._scenario = scenario
-        self.reset()
+        self.state = _get_init_state(self._scenario)  # Do not call reset here due to inheritance
 
     @property
     def scenario(self) -> AircraftCarrierScenario:
