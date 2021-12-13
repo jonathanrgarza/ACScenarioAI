@@ -339,7 +339,7 @@ def run_agent(perform_training: bool, perform_test: bool, run_env: bool):
 
         reward_score = 0
         steps = 0
-        for _ in range(1000):
+        for _ in range(250):
             action, _states = model.predict(state)
             new_state, reward, done, info = env.step(action)
             state = new_state

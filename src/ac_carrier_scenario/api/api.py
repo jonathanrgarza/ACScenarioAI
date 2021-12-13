@@ -1,12 +1,8 @@
 from typing import Optional
 
 from flask import Flask, request, Response, jsonify, make_response
-import gym
-from stable_baselines3 import PPO
-from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.monitor import Monitor
 
-from helpers import get_scenario_from_json
+from helpers import get_scenario_from_json, perform_analysis
 from ac_carrier_scenario.common import AircraftCarrierScenario
 
 app = Flask(__name__)
@@ -26,11 +22,18 @@ def analysis() -> Response:
     is_valid_request: bool = False
     is_valid_scenario: bool = False
 
+    results: Optional[dict] = None
+
     if content_json is not None:
         is_valid_request = True
         # Turn request into a scenario
 
-        scenario: AircraftCarrierScenario = get_scenario_from_json(content_json)
+        scenario: Optional[AircraftCarrierScenario] = get_scenario_from_json(content_json)
+
+        if scenario is not None:
+            is_valid_scenario = True
+            # Perform analysis
+            results = perform_analysis(scenario)
 
     # Make response
 
@@ -43,8 +46,13 @@ def analysis() -> Response:
                                  400)  # Bad Request
         response.mimetype = "application/json"
     else:
-        response = make_response("DATA", 200)
-        response.mimetype = "application/json"
+        if results is None:
+            response = make_response("{error:\"API encountered an unexpected error\"}",
+                                     500)  # Internal Server Error
+            response.mimetype = "application/json"
+        else:
+            response = make_response(jsonify(results), 200)
+            response.mimetype = "application/json"
 
     return response
 

@@ -97,6 +97,21 @@ class AircraftCarrierScenarioEnv(Env):
             })
         self.state: dict = self.reset()
 
+    @property
+    def is_expected_damage_met(self) -> bool:
+        """
+        Gets whether the expected damage for the scenario was met.
+
+        :return: True if the expected damage for all targets was met, otherwise, False.
+        """
+        is_expected_damage_met = True
+        for ship_index in range(0, NUMBER_OF_TARGETS):
+            if (self.state["currentShipDamage"][ship_index] <
+                    self.state["expectedShipDamage"][ship_index]):
+                is_expected_damage_met = False
+                break
+        return is_expected_damage_met
+
     def render(self, mode="human") -> None:
         """
         Renders the environment. Not currently implemented.
@@ -229,12 +244,7 @@ class AircraftCarrierScenarioEnv(Env):
         if self.state["pilots"] < 0:
             reward -= 200
 
-        is_expected_damage_met = True
-        for ship_index in range(0, NUMBER_OF_TARGETS):
-            if (self.state["currentShipDamage"][ship_index] <
-                    self.state["expectedShipDamage"][ship_index]):
-                is_expected_damage_met = False
-                break
+        is_expected_damage_met = self.is_expected_damage_met
 
         if is_expected_damage_met:
             # Reward for meeting the expected damage
