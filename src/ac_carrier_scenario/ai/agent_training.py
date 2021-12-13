@@ -298,17 +298,17 @@ def perform_agent_training(logger: Logger):
     # Parallel Environments
     env = make_vec_env("ACS-v0", n_envs=4)
 
+    model_save_path = "models/trained_model_v2"
     try:
-        model = PPO.load("models/trained_model_v2", env)
+        model = PPO.load(model_save_path, env)
     except FileNotFoundError:
         model = None
-        logger.log("No existing model found at models/best_model.zip")
 
     if model is None:
-        logger.log("No existing model. Creating a new model to learn with")
+        logger.log(f"No existing model found at '{model_save_path}.zip'. Creating a new model to learn with")
         model = get_new_ppo_agent(env, "models/logging", True)
     else:
-        logger.log("Existing model found. Will continue its learning")
+        logger.log(f"Existing model found at '{model_save_path}.zip'. Will continue its learning")
 
     model.set_logger(logger)
 
@@ -325,9 +325,9 @@ def perform_agent_training(logger: Logger):
         except KeyboardInterrupt:
             pass
 
-    model.save("models/trained_model_v2")
+    model.save(model_save_path)
     env.close()
-    logger.log("Training complete")
+    logger.log(f"Training complete. Results saved to: '{model_save_path}.zip'")
 
     return model
 
