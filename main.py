@@ -1,6 +1,7 @@
 import time
 from datetime import datetime, timedelta
 
+# noinspection PyUnresolvedReferences
 from ac_carrier_scenario.ai.agent_training import run_agent
 from ac_carrier_scenario.api.api import app
 

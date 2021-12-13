@@ -13,18 +13,18 @@ import optuna
 from gym import Env
 from optuna.visualization import plot_optimization_history, plot_param_importances
 from stable_baselines3 import PPO, A2C
-from stable_baselines3.common.callbacks import StopTrainingOnRewardThreshold, EvalCallback
+from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import Logger, configure
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import VecEnv
 
+# Import the custom env
+# noinspection PyUnresolvedReferences
+import ac_carrier_scenario.common  # This is required to register the gym environment
 import ac_carrier_scenario.util.stay_awake as stay_awake
 from ac_carrier_scenario.ai.trial_eval_callback import TrialEvalCallback
-
-# Import the custom env
-import ac_carrier_scenario.common  # This is required to register the gym environment
 
 
 def clear_console() -> None:

@@ -1,15 +1,16 @@
 from typing import Optional
 
 import numpy as np
-import gym
+from flask import Response, jsonify
+from gym import Env
 from gym.wrappers import TimeLimit
-from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.on_policy_algorithm import OnPolicyAlgorithm
 
-from ac_carrier_scenario.common.scenarios import AircraftCarrierScenario
 from ac_carrier_scenario.common.environment import SpecificAircraftCarrierScenarioEnv
+from ac_carrier_scenario.common.scenarios import AircraftCarrierScenario
 
 
 def get_scenario_from_json(json: dict) -> Optional[AircraftCarrierScenario]:
@@ -67,12 +68,14 @@ def perform_analysis(scenario: AircraftCarrierScenario) -> Optional[dict]:
         return None
 
     monitored_env: Monitor = Monitor(env)
+    n_eval_episodes = 10
     mean_solves, mean_episode_length, mean_rewards, std_rewards = _get_analysis(
-        model, monitored_env, n_eval_episodes=10)
+        model, monitored_env, n_eval_episodes=n_eval_episodes)
 
     return {
         "mean_solves": mean_solves, "mean_episode_length": mean_episode_length,
-        "mean_rewards": mean_rewards, "std_rewards": std_rewards
+        "mean_rewards": mean_rewards, "std_rewards": std_rewards,
+        "total_episodes": n_eval_episodes
     }
 
 
@@ -122,3 +125,41 @@ def _get_analysis(model: OnPolicyAlgorithm, monitored_env: Monitor,
     std_rewards: float = np.std(rewards)
 
     return mean_solved_envs, mean_episode_length, mean_rewards, std_rewards
+
+
+def get_performance_stats(scenario: AircraftCarrierScenario) -> Optional[dict]:
+    # Create the specific env from the given scenario
+    # ENSURE TO WRAP ENV in TimeLimit wrapper
+    env: Env = TimeLimit(env=SpecificAircraftCarrierScenarioEnv(scenario), max_episode_steps=250)
+
+    # Load the agent/model
+    try:
+        model = PPO.load("models/trained_model_more", env)
+    except FileNotFoundError:
+        return None
+
+    monitored_env: Monitor = Monitor(env)
+    n_eval_episodes = 10
+    mean_rewards, std_rewards = evaluate_policy(
+        model, monitored_env, n_eval_episodes=n_eval_episodes)
+
+    return {
+        "mean_rewards": mean_rewards, "std_rewards": std_rewards, "total_episodes": n_eval_episodes
+    }
+
+
+def get_flask_response(is_valid_request: bool, is_valid_scenario: bool, results: Optional[dict]) -> Response:
+    if not is_valid_request:
+        response = jsonify("{error:\"No JSON data was submitted or mimetype was not 'application/json'\"}")
+        response.status_code = 400  # Bad Request
+    elif not is_valid_scenario:
+        response = jsonify("{error:\"Not a valid scenario\"}")
+        response.status_code = 400  # Bad Request
+    else:
+        if results is None:
+            response = jsonify("{error:\"API encountered an unexpected error\"}")
+            response.status_code = 500  # Internal Server Error
+        else:
+            response = jsonify(results)
+            response.status_code = 200
+    return response
