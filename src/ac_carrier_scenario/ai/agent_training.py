@@ -144,12 +144,20 @@ def agent_objective(trial: optuna.Trial) -> int:
     gae_lambda = trial.suggest_categorical("gae_lambda", [0.8, 0.9, 0.92, 0.95, 0.98, 0.99, 1.0])
     max_grad_norm = trial.suggest_categorical("max_grad_norm", [0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 5])
 
+    net_arch = trial.suggest_categorical("net_arch", ["small", "medium"])
+    activation_fn = trial.suggest_categorical("activation_fn", ["tanh", "relu"])
+
+    # Convert net_arch and activation_fn to correct value/types
+    net_arch = net_arch_to_dict(net_arch)
+    activation_fn = activation_fn_to_type(activation_fn)
+
     # Launch tensorboard with command: tensorboard --logdir=models/optuna/logging
 
     if algorithm == "PPO":
         # Get trial's hyperparameters that are for PPO algorithm only
         clip_range = trial.suggest_categorical("clip_range", [0.1, 0.2, 0.3, 0.4])
         n_epochs = trial.suggest_categorical("n_epochs", [1, 5, 10, 20])
+        ortho_init = False
 
         # Suggestion: factors of n_steps * n_envs (number of environments (parallel))
         # batch_size = trial.suggest_categorical("batch_size", factors(n_steps))
@@ -169,19 +177,34 @@ def agent_objective(trial: optuna.Trial) -> int:
         if batch_size > n_steps:
             batch_size = n_steps
 
+        policy_kwargs: dict[str, Any] = {
+            "net_arch": net_arch,
+            "activation_fn": activation_fn,
+            "ortho_init": ortho_init
+        }
+
         model = PPO(policy, monitored_env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps,
                     n_epochs=n_epochs, batch_size=batch_size, ent_coef=ent_coef, clip_range=clip_range,
                     gae_lambda=gae_lambda, max_grad_norm=max_grad_norm, vf_coef=vf_coef,
+                    policy_kwargs=policy_kwargs,
                     tensorboard_log="models/optuna/logging", verbose=0)
     elif algorithm == "A2C":
         # Get trial's hyperparameters that are for A2C algorithm only
+        ortho_init = trial.suggest_categorical("ortho_init", [False, True])
         normalize_advantage = trial.suggest_categorical("normalize_advantage", [False, True])
         # Toggle PyTorch RMS Prop (different from TF one, cf doc)
         use_rms_prop = trial.suggest_categorical("use_rms_prop", [False, True])
 
+        policy_kwargs: dict[str, Any] = {
+            "net_arch": net_arch,
+            "activation_fn": activation_fn,
+            "ortho_init": ortho_init
+        }
+
         model = A2C(policy, monitored_env, learning_rate=learning_rate, n_steps=n_steps, gamma=gamma,
                     gae_lambda=gae_lambda, ent_coef=ent_coef, vf_coef=vf_coef, max_grad_norm=max_grad_norm,
                     use_rms_prop=use_rms_prop, normalize_advantage=normalize_advantage,
+                    policy_kwargs=policy_kwargs,
                     tensorboard_log="models/optuna/logging", verbose=0)
     else:
         raise ValueError(f"Invalid algorithm selected: {algorithm}")
