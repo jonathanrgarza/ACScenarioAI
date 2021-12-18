@@ -5,7 +5,7 @@ import logging
 import os
 import time
 from datetime import timedelta
-from typing import Optional, Union
+from typing import Optional, Union, Any, Type
 
 import gym
 import optuna
@@ -19,6 +19,8 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import Logger, configure
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import VecEnv
+
+from torch import nn
 
 # Import the custom env
 # noinspection PyUnresolvedReferences
@@ -76,6 +78,38 @@ def get_ideal_scenario_env() -> Env:
 
 
 _optuna_logger: logging.Logger  # Logger for optuna studies
+
+
+def net_arch_to_dict(size: str) -> list[dict[str, list[int]]]:
+    """
+    Converts a net_arch string to the correct type. Only useful for PPO or A2C agents.
+    :param size: The size string to convert. Supports: 'small' or 'medium'
+    :return: The converted value.
+    """
+    lowered_size: str = size.lower()
+    if lowered_size == "small":
+        return [dict(pi=[64, 64], vf=[64, 64])]
+    elif lowered_size == "medium":
+        return [dict(pi=[256, 256], vf=[256, 256])]
+    raise ValueError("Invalid size string. Only 'small' or 'medium' is supported.")
+
+
+def activation_fn_to_type(name: str) -> Type[Union[nn.Tanh, nn.ReLU, nn.ELU, nn.LeakyReLU]]:
+    """
+    Converts a net_arch string to the correct type.
+    :param name: The name string to convert. Supports: 'tanh', 'relu', 'elu', or 'leaky_relu'
+    :return: The converted value (a type).
+    """
+    lowered_name: str = name.lower()
+    if lowered_name == "tanh":
+        return nn.Tanh
+    elif lowered_name == "relu":
+        return nn.ReLU
+    elif lowered_name == "elu":
+        return nn.ELU
+    elif lowered_name == "leaky_relu":
+        return nn.LeakyReLU
+    raise ValueError("Invalid name string. Only 'tanh', 'relu', 'elu', or 'leaky_relu' is supported.")
 
 
 def agent_objective(trial: optuna.Trial) -> int:
@@ -287,17 +321,29 @@ def get_new_ppo_agent(env: Union[Env, VecEnv, str],
 
     policy = "MultiInputPolicy"  # This policy is required for Dict type of environments
 
-    # Set the best hyperparams found; value reached for these parameters: 800
+    # Set the best hyperparams found; value reached for these parameters: 1012
     batch_size = 8
-    clip_range = 0.4
-    ent_coef = 2.931484907646462e-05
-    gae_lambda = 1.0
-    gamma = 0.9
-    learning_rate = 0.0001271857047377097
-    max_grad_norm = 5
+    clip_range = 0.1
+    ent_coef = 9.106467242333995e-06
+    gae_lambda = 0.95
+    gamma = 0.98
+    learning_rate = 0.4976487507374257
+    max_grad_norm = 1
     n_epochs = 20
-    n_steps = 128
-    vf_coef = 0.06252372815378887
+    n_steps = 256
+    vf_coef = 0.6629858702970707
+    net_arch = "medium"
+    activation_fn = "relu"
+    ortho_init = False
+
+    net_arch = net_arch_to_dict(net_arch)
+    activation_fn = activation_fn_to_type(activation_fn)
+
+    policy_kwargs: dict[str, Any] = {
+        "net_arch": net_arch,
+        "activation_fn": activation_fn,
+        "ortho_init": ortho_init
+    }
 
     verbose_int = 0
     if verbose:
@@ -306,6 +352,7 @@ def get_new_ppo_agent(env: Union[Env, VecEnv, str],
     model = PPO(policy, env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps, n_epochs=n_epochs,
                 batch_size=batch_size, ent_coef=ent_coef, clip_range=clip_range,
                 gae_lambda=gae_lambda, max_grad_norm=max_grad_norm, vf_coef=vf_coef,
+                policy_kwargs=policy_kwargs,
                 tensorboard_log=tensorboard_log, verbose=verbose_int)
     return model
 
