@@ -5,6 +5,7 @@ import logging
 import os
 import time
 from datetime import timedelta
+from pprint import pprint
 from typing import Optional, Union, Any, Type, Callable
 
 import gym
@@ -362,32 +363,8 @@ def linear_schedule(initial_value: Union[float, str]) -> Callable[[float], float
     return linear_algo
 
 
-def get_new_ppo_agent(env: Union[Env, VecEnv, str],
-                      tensorboard_log: Optional[str] = None, verbose: bool = False) -> PPO:
-    """
-    Gets a new PPO agent for the given environment. This is meant only for the AC Carrier Scenario.
-
-    :param env: The gym environment.
-    :param tensorboard_log: The tensorboard log location. Default is None.
-    :param verbose: The verbose setting. Default is False.
-    :return: The PPO agent.
-    """
-    if env is None:
-        raise ValueError("The env is not set")
-
-    policy = "MultiInputPolicy"  # This policy is required for Dict type of environments
-
+def get_agent_hyperparameters() -> dict[str, Any]:
     # Set the best hyperparams found; value reached for these parameters: 1012
-    batch_size = 8
-    clip_range = 0.1
-    ent_coef = 9.106467242333995e-06
-    gae_lambda = 0.95
-    gamma = 0.98
-    learning_rate = 0.4976487507374257
-    max_grad_norm = 1
-    n_epochs = 20
-    n_steps = 256
-    vf_coef = 0.6629858702970707
     net_arch = "medium"
     activation_fn = "relu"
     ortho_init = False
@@ -401,15 +378,47 @@ def get_new_ppo_agent(env: Union[Env, VecEnv, str],
         "ortho_init": ortho_init
     }
 
+    model_parameters = {
+        "policy": "MultiInputPolicy",  # This policy is required for Dict type of environments
+        # Hyperparameters
+        "batch_size": 8,
+        "clip_range": 0.1,
+        "ent_coef": 9.106467242333995e-06,
+        "gae_lambda": 0.95,
+        "gamma": 0.98,
+        "learning_rate": 0.4976487507374257,
+        "max_grad_norm": 1,
+        "n_epochs": 20,
+        "n_steps": 256,
+        "vf_coef": 0.6629858702970707,
+        "policy_kwargs": policy_kwargs
+    }
+    return model_parameters
+
+
+def get_new_ppo_agent(env: Union[Env, VecEnv, str],
+                      tensorboard_log: Optional[str] = None, verbose: bool = False) -> PPO:
+    """
+    Gets a new PPO agent for the given environment. This is meant only for the AC Carrier Scenario.
+
+    :param env: The gym environment.
+    :param tensorboard_log: The tensorboard log location. Default is None.
+    :param verbose: The verbose setting. Default is False.
+    :return: The PPO agent.
+    """
+    if env is None:
+        raise ValueError("The env is not set")
+
+    model_parameters = get_agent_hyperparameters()
+
+    print("Hyperparameters for agent")
+    pprint(model_parameters)
+
     verbose_int = 0
     if verbose:
         verbose_int = 1
 
-    model = PPO(policy, env, learning_rate=learning_rate, gamma=gamma, n_steps=n_steps, n_epochs=n_epochs,
-                batch_size=batch_size, ent_coef=ent_coef, clip_range=clip_range,
-                gae_lambda=gae_lambda, max_grad_norm=max_grad_norm, vf_coef=vf_coef,
-                policy_kwargs=policy_kwargs,
-                tensorboard_log=tensorboard_log, verbose=verbose_int)
+    model = PPO(env, tensorboard_log=tensorboard_log, verbose=verbose_int, **model_parameters)
     return model
 
 
