@@ -484,6 +484,7 @@ def _perform_agent_run(logger: Logger, env: Monitor, model, verbose: bool = Fals
 
     reward_score = 0
     steps = 0
+    info = dict()
     for _ in range(251):
         action, _states = model.predict(state)
         new_state, reward, done, info = env.step(action)
@@ -505,7 +506,11 @@ def _perform_agent_run(logger: Logger, env: Monitor, model, verbose: bool = Fals
                 logger.info(f"Reward Sum/Score: {reward_score}, Steps: {steps}")
             break
 
-    if not done and verbose:
+    completed = True
+    if not done or "TimeLimit.truncated" in info:
+        completed = False
+
+    if not completed and verbose:
         logger.info("Agent could not complete the environment")
 
     ideal_env: Union[DummyVecEnv, VecEnv, SpecificAircraftCarrierScenarioEnv] = env.unwrapped
@@ -518,7 +523,7 @@ def _perform_agent_run(logger: Logger, env: Monitor, model, verbose: bool = Fals
         else:
             logger.info("Agent FAILED to meet expected damage requirements")
             logger.info(f"Env: {state}")
-    return reward_score, steps, done, ideal_env.is_expected_damage_met
+    return reward_score, steps, completed, ideal_env.is_expected_damage_met
 
 
 def _perform_agent_runs(logger: Logger, model, n_episodes: int = 1, use_ideal_scenario: bool = True):
@@ -535,21 +540,21 @@ def _perform_agent_runs(logger: Logger, model, n_episodes: int = 1, use_ideal_sc
     else:
         total_reward = []
         total_steps = []
-        done_envs = []
+        complete_envs = []
         expected_damage_met_list = []
         for _ in range(n_episodes):
             reward_score, steps, done, expected_damage_met = _perform_agent_run(logger=logger, env=env,
                                                                                 model=model, verbose=False)
             total_reward.append(reward_score)
             total_steps.append(steps)
-            done_envs.append(done)
+            complete_envs.append(done)
             expected_damage_met_list.append(expected_damage_met)
 
         reward_avg = np.mean(total_reward)
         reward_std = np.std(total_reward)
         steps_avg = np.mean(total_steps)
         steps_std = np.std(total_steps)
-        done_avg = np.mean(done_envs) * 100
+        done_avg = np.mean(complete_envs) * 100
         expected_damage_met_avg = np.mean(expected_damage_met_list) * 100
 
         logger.info(f"Avg Reward Score: {reward_avg:.0f} +/- {reward_std:.0f}, "
