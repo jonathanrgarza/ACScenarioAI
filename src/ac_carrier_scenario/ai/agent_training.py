@@ -5,7 +5,7 @@ import logging
 import os
 import time
 from datetime import timedelta
-from typing import Optional, Union, Any, Type
+from typing import Optional, Union, Any, Type, Callable
 
 import gym
 import numpy as np
@@ -137,6 +137,7 @@ def agent_objective(trial: optuna.Trial) -> int:
     policy = "MultiInputPolicy"
 
     # Get trial's hyperparameters that are common to all algorithms
+    lr_schedule = "constant"
     learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1)
     n_steps = trial.suggest_categorical("n_steps", [8, 16, 32, 64, 128, 256, 512, 1024, 2048])
     gamma = trial.suggest_categorical("gamma", [0.9, 0.95, 0.98, 0.99, 0.995, 0.999, 0.9999])
@@ -159,6 +160,10 @@ def agent_objective(trial: optuna.Trial) -> int:
         clip_range = trial.suggest_categorical("clip_range", [0.1, 0.2, 0.3, 0.4])
         n_epochs = trial.suggest_categorical("n_epochs", [1, 5, 10, 20])
         ortho_init = False
+
+        # Convert learning_rate to a linear schedule IF schedule is linear
+        if lr_schedule == "linear":
+            learning_rate = linear_schedule(learning_rate)
 
         # Suggestion: factors of n_steps * n_envs (number of environments (parallel))
         # batch_size = trial.suggest_categorical("batch_size", factors(n_steps))
@@ -195,6 +200,12 @@ def agent_objective(trial: optuna.Trial) -> int:
         normalize_advantage = trial.suggest_categorical("normalize_advantage", [False, True])
         # Toggle PyTorch RMS Prop (different from TF one, cf doc)
         use_rms_prop = trial.suggest_categorical("use_rms_prop", [False, True])
+
+        lr_schedule = trial.suggest_categorical("lr_schedule", ["linear", "constant"])
+
+        # Convert learning_rate to a linear schedule IF schedule is linear
+        if lr_schedule == "linear":
+            learning_rate = linear_schedule(learning_rate)
 
         policy_kwargs: dict[str, Any] = {
             "net_arch": net_arch,
@@ -330,6 +341,25 @@ def test_agent(model, env: Union[Env, Monitor, VecEnv], n_eval_episodes: int = 1
 
     model.set_env(monitored_env)
     return evaluate_policy(model, monitored_env, n_eval_episodes=n_eval_episodes)
+
+
+def linear_schedule(initial_value: Union[float, str]) -> Callable[[float], float]:
+    """
+    Linear learning rate schedule.
+    :param initial_value: The initial value (float or str)
+    :return: The delegate function
+    """
+    if isinstance(initial_value, str):
+        initial_value = float(initial_value)
+
+    def linear_algo(progress_remaining: float) -> float:
+        """
+        Progress will decrease from 1 (beginning) to 0
+        :param progress_remaining: (float)
+        :return: (float)
+        """
+        return progress_remaining * initial_value
+    return linear_algo
 
 
 def get_new_ppo_agent(env: Union[Env, VecEnv, str],
