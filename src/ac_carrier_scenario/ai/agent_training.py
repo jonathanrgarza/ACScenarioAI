@@ -8,6 +8,7 @@ from datetime import timedelta
 from typing import Optional, Union, Any, Type
 
 import gym
+import numpy as np
 import optuna
 from gym import Env
 from gym.wrappers import TimeLimit
@@ -242,7 +243,7 @@ def agent_objective(trial: optuna.Trial) -> int:
     return reward
 
 
-def perform_optuna_optimizing(n_trials: int = 100):
+def perform_optuna_optimizing(study_name: str = "agent_study_2", n_trials: int = 100):
     global _optuna_logger
     # Add stream handler of stdout to show the messages
     _optuna_logger = optuna.logging.get_logger("optuna")
@@ -250,6 +251,9 @@ def perform_optuna_optimizing(n_trials: int = 100):
     # log_handler = logging.StreamHandler(sys.stdout)
     # log_handler.setFormatter(logging.Formatter("[%(asctime)s] %(message)s"))
     # logger.addHandler(log_handler)
+
+    if not isinstance(study_name, str):
+        raise ValueError(f"study_name is not of type 'str': {type(study_name)}")
 
     _optuna_logger.info("Initializing an optuna hyperparameter optimization study run")
 
@@ -260,7 +264,6 @@ def perform_optuna_optimizing(n_trials: int = 100):
         _optuna_logger.error("Could not create folder 'models/optuna'. Create this folder first and try again.")
         exit(1)
 
-    study_name = "agent_study_2"  # Unique identifier of the study
     storage_name = f"sqlite:///models/optuna/{study_name}.db"
     study = optuna.create_study(study_name=study_name, storage=storage_name, direction="maximize", load_if_exists=True)
 
@@ -380,12 +383,12 @@ def get_new_ppo_agent(env: Union[Env, VecEnv, str],
     return model
 
 
-def perform_agent_training(logger: Logger):
+def perform_agent_training(logger: Logger, model_save_path: str = "models/trained_model_v2",
+                           best_model_save_path: str = "models", tb_log_path: Optional[str] = None,
+                           n_envs: int = 6, n_eval_episodes: int = 5, eval_freq: int = 10000, verbose: bool = False):
     # Parallel Environments
-    env = make_vec_env("ACS-v0", n_envs=6)
+    env = make_vec_env("ACS-v0", n_envs=n_envs)
 
-    model_save_path = "models/trained_model_v2"
-    tb_log_path: Optional[str] = "models/logging"
     try:
         model = PPO.load(model_save_path, env, tensorboard_log=tb_log_path)
     except FileNotFoundError:
@@ -404,11 +407,13 @@ def perform_agent_training(logger: Logger):
     eval_env = Monitor(gym.make("ACS-v0"))
     # callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=10, verbose=1)
     callback_on_best = None
+    verbose_int = 1 if verbose else 0
     eval_callback = EvalCallback(eval_env=eval_env, callback_on_new_best=callback_on_best,
-                                 best_model_save_path="models", verbose=1)
+                                 best_model_save_path=best_model_save_path, eval_freq=eval_freq,
+                                 n_eval_episodes=n_eval_episodes, verbose=verbose_int)
     with stay_awake.keep_awake():
         try:
-            model.learn(total_timesteps=25000 * 500, callback=eval_callback)
+            model.learn(total_timesteps=25000 * 100, callback=eval_callback)
         except KeyboardInterrupt:
             pass
 
@@ -419,72 +424,125 @@ def perform_agent_training(logger: Logger):
     return model
 
 
-def run_agent(perform_training: bool, perform_test: bool, run_env: bool):
-    print("Running stable_baselines3 PPO agent")
+def _perform_agent_run(logger: Logger, env: Monitor, model, verbose: bool = False):
+    state = env.reset()
+    done = False
 
-    # Init logger
-    logger: Logger = configure(None, ["stdout"])
+    reward_score = 0
+    steps = 0
+    for _ in range(251):
+        action, _states = model.predict(state)
+        new_state, reward, done, info = env.step(action)
+        state = new_state
 
-    if not perform_training and not perform_test and not run_env:
-        logger.log("No action to perform, please update script/program and run again")
-        return
+        reward_score += reward
+        steps += 1
 
-    if perform_training:
-        model = perform_agent_training(logger)
-    else:
-        logger.log("Training option disabled. Loading model from file")
-        env = make_vec_env("ACS-v0")
-        model = PPO.load("models/best_model", env)
-
-    if perform_test:
-        env = make_vec_env("ACS-v0")
-        model.set_env(env)
-        mean_rewards, std_rewards = test_agent(model, env, n_eval_episodes=10)
-        logger.log(f"Random Performance: Rewards: {mean_rewards} +/- {std_rewards:.2f}")
-
-        env = Monitor(get_ideal_scenario_env())
-        model.set_env(env)
-        mean_rewards, std_rewards = test_agent(model, env, n_eval_episodes=10)
-        logger.log(f"Ideal Performance: Rewards: {mean_rewards} +/- {std_rewards:.2f}")
-
-    if run_env:
-        env = Monitor(get_ideal_scenario_env())
-        model.set_env(env)
-        state = env.reset()
-        done = False
-
-        reward_score = 0
-        steps = 0
-        for _ in range(251):
-            action, _states = model.predict(state)
-            new_state, reward, done, info = env.step(action)
-            state = new_state
-
-            reward_score += reward
-            steps += 1
-
-            # clear_console()
-            # env.render()
+        # clear_console()
+        # env.render()
+        if verbose:
             logger.log(f"Step#: {steps}, Reward: {reward}, Action: {action}, currentShipDamage: "
                        f"{state['currentShipDamage']}, missiles: {state['missiles']}")
+        if verbose:
             time.sleep(0.3)
 
-            if done:
+        if done:
+            if verbose:
                 logger.log(f"Reward Sum/Score: {reward_score}, Steps: {steps}")
-                break
+            break
 
-        if not done:
-            logger.log("Agent could not complete the environment")
+    if not done and verbose:
+        logger.log("Agent could not complete the environment")
 
-        ideal_env: SpecificAircraftCarrierScenarioEnv = env.unwrapped
+    ideal_env: SpecificAircraftCarrierScenarioEnv = env.unwrapped
+    if verbose:
         if ideal_env.is_expected_damage_met:
             logger.log("Agent met expected damage requirements")
         else:
             logger.log("Agent FAILED to meet expected damage requirements")
             logger.log(f"Env: {state}")
+    return reward_score, steps, done, ideal_env.is_expected_damage_met
 
-        env.close()
-        logger.log("Run complete")
+
+def _perform_agent_runs(logger: Logger, model, n_episodes: int = 1):
+    env = Monitor(get_ideal_scenario_env())
+    model.set_env(env)
+
+    if n_episodes == 1:
+        _perform_agent_run(logger=logger, env=env, model=model, verbose=True)
+    else:
+        total_reward = []
+        total_steps = []
+        done_envs = []
+        expected_damage_met_list = []
+        for _ in range(n_episodes):
+            reward_score, steps, done, expected_damage_met = _perform_agent_run(logger=logger, env=env,
+                                                                                model=model, verbose=False)
+            total_reward.append(reward_score)
+            total_steps.append(steps)
+            done_envs.append(done)
+            expected_damage_met_list.append(expected_damage_met)
+
+        reward_avg = np.mean(total_reward)
+        reward_std = np.std(total_reward)
+        steps_avg = np.mean(total_steps)
+        steps_std = np.std(total_steps)
+        done_avg = np.mean(done_envs) * 100
+        expected_damage_met_avg = np.mean(expected_damage_met_list) * 100
+
+        logger.log(f"Avg Reward Score: {reward_avg} +/- {reward_std}, Avg Steps: {steps_avg} +/- {steps_std}, "
+                   f"Completion Avg: {done_avg:.1f}%, Expected Damage Met Avg: {expected_damage_met_avg:.1f}%")
+
+    env.close()
+    logger.log("Run complete")
+
+
+def train_agent(perform_training: bool, perform_test: bool, run_env: bool,
+                use_best_model: bool = True,
+                model_save_path: str = "models/trained_model_v2",
+                best_model_save_path: str = "models", tb_log_path: Optional[str] = None,
+                n_envs: int = 6, n_eval_episodes: int = 5, eval_freq: int = 10000, verbose: bool = False,
+                test_n_eval_episodes: int = 10):
+    # Init logger
+    logger: Logger = configure(None, ["stdout"])
+
+    logger.info("Running stable_baselines3 PPO agent training")
+
+    if not perform_training and not perform_test and not run_env:
+        logger.warn("No action to perform, please select at least one action and run again")
+        return
+
+    if perform_training:
+        model = perform_agent_training(logger, model_save_path, best_model_save_path,
+                                       tb_log_path, n_envs, n_eval_episodes, eval_freq, verbose)
+    else:
+        logger.log("Training option disabled. Loading model from file")
+        env = make_vec_env("ACS-v0")
+
+        model_path = f"{best_model_save_path}/best_model" if use_best_model else model_save_path
+        model = PPO.load(model_path, env)
+
+    if perform_test:
+        env = make_vec_env("ACS-v0")
+        model.set_env(env)
+        mean_rewards, std_rewards = test_agent(model, env, n_eval_episodes=test_n_eval_episodes)
+        logger.log(f"Random Performance: Rewards: {mean_rewards} +/- {std_rewards:.2f}")
+
+        env = Monitor(get_ideal_scenario_env())
+        model.set_env(env)
+        mean_rewards, std_rewards = test_agent(model, env, n_eval_episodes=test_n_eval_episodes)
+        logger.log(f"Ideal Performance: Rewards: {mean_rewards} +/- {std_rewards:.2f}")
+
+    if run_env:
+        _perform_agent_runs(logger, model, 1)
+
+
+def run_agent(model_path: str = "models/trained_model_v2", n_episodes: int = 1):
+    # Init logger
+    logger: Logger = configure(None, ["stdout"])
+
+    model = PPO.load(model_path)
+    _perform_agent_runs(logger, model, n_episodes)
 
 
 PERFORM_TRAINING = True
@@ -494,5 +552,5 @@ RUN_ENV = False
 if __name__ == "__main__":
     start_time = time.time()
     # perform_optuna_optimizing()
-    run_agent(PERFORM_TRAINING, PERFORM_TESTING, RUN_ENV)
+    train_agent(PERFORM_TRAINING, PERFORM_TESTING, RUN_ENV)
     print(f"Finished program. Execution time: {timedelta(seconds=(time.time() - start_time))}")

@@ -20,5 +20,10 @@ setup(
     author='Jonathan Garza',
     author_email='',
     description='AI Project related to an AC Carrier Scenario',
-    install_requires=install_requires
+    install_requires=install_requires,
+    entry_points={
+        'console_scripts': [
+            'ac_carrier_scenario = ac_carrier_scenario.common.main:main',
+        ],
+    }
 )
