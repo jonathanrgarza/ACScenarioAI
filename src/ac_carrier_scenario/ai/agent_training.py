@@ -5,7 +5,7 @@ import logging
 import os
 import time
 from datetime import timedelta
-from pprint import pprint
+from pprint import pformat
 from typing import Optional, Union, Any, Type, Callable
 
 import gym
@@ -18,7 +18,7 @@ from stable_baselines3 import PPO, A2C
 from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.logger import Logger, configure
+from stable_baselines3.common.logger import Logger, configure, INFO
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import VecEnv, DummyVecEnv
 
@@ -223,12 +223,12 @@ def agent_objective(trial: optuna.Trial) -> int:
         raise ValueError(f"Invalid algorithm selected: {algorithm}")
 
     # Create the evaluation callback
-    eval_callback = TrialEvalCallback(eval_env, trial, verbose=0)
+    eval_callback = TrialEvalCallback(eval_env, trial, verbose=1)
 
     try:
         # No keep awake needed here as this is called by optuna which has been kept awake
         _optuna_logger.info(f"Starting a trial '{trial.number}' using the '{algorithm}' algorithm")
-        model.learn(25000 * 5, callback=eval_callback)
+        model.learn(25000 * 2 + 1, callback=eval_callback)
 
         model.env.close()
         eval_env.close()
@@ -360,19 +360,17 @@ def linear_schedule(initial_value: Union[float, str]) -> Callable[[float], float
         :return: (float)
         """
         return progress_remaining * initial_value
+
     return linear_algo
 
 
-def get_agent_hyperparameters() -> dict[str, Any]:
-    # Set the best hyperparams found; value reached for these parameters: 1012
-    net_arch = "medium"
+def get_agent_hyperparameters_raw() -> dict[str, Union[str, int, dict[str, Any]]]:
+    # Set the best hyperparams found; value reached for these parameters: -18
+    net_arch = "small"
     activation_fn = "relu"
     ortho_init = False
 
-    net_arch = net_arch_to_dict(net_arch)
-    activation_fn = activation_fn_to_type(activation_fn)
-
-    policy_kwargs: dict[str, Any] = {
+    policy_kwargs: dict[str, Union[str, bool]] = {
         "net_arch": net_arch,
         "activation_fn": activation_fn,
         "ortho_init": ortho_init
@@ -382,26 +380,41 @@ def get_agent_hyperparameters() -> dict[str, Any]:
         "policy": "MultiInputPolicy",  # This policy is required for Dict type of environments
         # Hyperparameters
         "batch_size": 8,
-        "clip_range": 0.1,
-        "ent_coef": 9.106467242333995e-06,
-        "gae_lambda": 0.95,
-        "gamma": 0.98,
-        "learning_rate": 0.4976487507374257,
-        "max_grad_norm": 1,
+        "clip_range": 0.4,
+        "ent_coef": 2.931484907646462e-05,
+        "gae_lambda": 1.0,
+        "gamma": 0.9,
+        "learning_rate": 0.0001271857047377097,
+        "max_grad_norm": 5,
         "n_epochs": 20,
-        "n_steps": 256,
-        "vf_coef": 0.6629858702970707,
+        "n_steps": 128,
+        "vf_coef": 0.06252372815378887,
         "policy_kwargs": policy_kwargs
     }
+
     return model_parameters
 
 
-def get_new_ppo_agent(env: Union[Env, VecEnv, str],
+def get_agent_hyperparameters() -> dict[str, Any]:
+    model_parameters = get_agent_hyperparameters_raw()
+
+    policy_kwargs = model_parameters["policy_kwargs"]
+
+    policy_kwargs["net_arch"] = net_arch_to_dict(
+        policy_kwargs["net_arch"])
+    policy_kwargs["activation_fn"] = activation_fn_to_type(
+        policy_kwargs["activation_fn"])
+
+    return model_parameters
+
+
+def get_new_ppo_agent(env: Union[Env, VecEnv, str], logger: Optional[Logger] = None,
                       tensorboard_log: Optional[str] = None, verbose: bool = False) -> PPO:
     """
     Gets a new PPO agent for the given environment. This is meant only for the AC Carrier Scenario.
 
     :param env: The gym environment.
+    :param logger: The logger to use. Default is None.
     :param tensorboard_log: The tensorboard log location. Default is None.
     :param verbose: The verbose setting. Default is False.
     :return: The PPO agent.
@@ -411,8 +424,10 @@ def get_new_ppo_agent(env: Union[Env, VecEnv, str],
 
     model_parameters = get_agent_hyperparameters()
 
-    print("Hyperparameters for agent")
-    pprint(model_parameters)
+    if logger is not None and logger.level >= INFO:
+        # Print out more user-friendly version of the hyperparameters
+        logger.info("Hyperparameters for agent")
+        logger.info(pformat(get_agent_hyperparameters_raw()))
 
     verbose_int = 0
     if verbose:
@@ -434,10 +449,10 @@ def perform_agent_training(logger: Logger, model_save_path: str = "models/traine
         model = None
 
     if model is None:
-        logger.log(f"No existing model found at '{model_save_path}.zip'. Creating a new model to learn with")
-        model = get_new_ppo_agent(env, tb_log_path, True)
+        logger.info(f"No existing model found at '{model_save_path}.zip'. Creating a new model to learn with")
+        model = get_new_ppo_agent(env=env, logger=logger, tensorboard_log=tb_log_path, verbose=True)
     else:
-        logger.log(f"Existing model found at '{model_save_path}.zip'. Will continue its learning")
+        logger.info(f"Existing model found at '{model_save_path}.zip'. Will continue its learning")
 
     model.set_logger(logger)
 
@@ -458,7 +473,7 @@ def perform_agent_training(logger: Logger, model_save_path: str = "models/traine
 
     model.save(model_save_path)
     env.close()
-    logger.log(f"Training complete. Results saved to: '{model_save_path}.zip'")
+    logger.info(f"Training complete. Results saved to: '{model_save_path}.zip'")
 
     return model
 
@@ -480,18 +495,18 @@ def _perform_agent_run(logger: Logger, env: Monitor, model, verbose: bool = Fals
         # clear_console()
         # env.render()
         if verbose:
-            logger.log(f"Step#: {steps}, Reward: {reward}, Action: {action}, currentShipDamage: "
-                       f"{state['currentShipDamage']}, missiles: {state['missiles']}")
+            logger.info(f"Step#: {steps}, Reward: {reward}, Action: {action}, currentShipDamage: "
+                        f"{state['currentShipDamage']}, missiles: {state['missiles']}")
         if verbose:
             time.sleep(0.3)
 
         if done:
             if verbose:
-                logger.log(f"Reward Sum/Score: {reward_score}, Steps: {steps}")
+                logger.info(f"Reward Sum/Score: {reward_score}, Steps: {steps}")
             break
 
     if not done and verbose:
-        logger.log("Agent could not complete the environment")
+        logger.info("Agent could not complete the environment")
 
     ideal_env: Union[DummyVecEnv, VecEnv, SpecificAircraftCarrierScenarioEnv] = env.unwrapped
     if isinstance(ideal_env, DummyVecEnv):
@@ -499,14 +514,16 @@ def _perform_agent_run(logger: Logger, env: Monitor, model, verbose: bool = Fals
 
     if verbose:
         if ideal_env.is_expected_damage_met:
-            logger.log("Agent met expected damage requirements")
+            logger.info("Agent met expected damage requirements")
         else:
-            logger.log("Agent FAILED to meet expected damage requirements")
-            logger.log(f"Env: {state}")
+            logger.info("Agent FAILED to meet expected damage requirements")
+            logger.info(f"Env: {state}")
     return reward_score, steps, done, ideal_env.is_expected_damage_met
 
 
 def _perform_agent_runs(logger: Logger, model, n_episodes: int = 1, use_ideal_scenario: bool = True):
+    logger.info(
+        f"Starting a run of {n_episodes} episodes using a {'ideal' if use_ideal_scenario else 'random'} environment")
     if use_ideal_scenario:
         env = Monitor(get_ideal_scenario_env())
     else:
@@ -535,11 +552,12 @@ def _perform_agent_runs(logger: Logger, model, n_episodes: int = 1, use_ideal_sc
         done_avg = np.mean(done_envs) * 100
         expected_damage_met_avg = np.mean(expected_damage_met_list) * 100
 
-        logger.log(f"Avg Reward Score: {reward_avg} +/- {reward_std}, Avg Steps: {steps_avg} +/- {steps_std}, "
-                   f"Completion Avg: {done_avg:.1f}%, Expected Damage Met Avg: {expected_damage_met_avg:.1f}%")
+        logger.info(f"Avg Reward Score: {reward_avg:.0f} +/- {reward_std:.0f}, "
+                    f"Avg Steps: {steps_avg:.0f} +/- {steps_std:.0f}, "
+                    f"Completion Avg: {done_avg:.1f}%, Expected Damage Met Avg: {expected_damage_met_avg:.1f}%")
 
     env.close()
-    logger.log("Run complete")
+    logger.info("Run complete")
 
 
 def train_agent(perform_training: bool, perform_test: bool, run_env: bool,
@@ -549,7 +567,7 @@ def train_agent(perform_training: bool, perform_test: bool, run_env: bool,
                 n_envs: int = 6, n_eval_episodes: int = 5, eval_freq: int = 10000, verbose: bool = False,
                 test_n_eval_episodes: int = 10):
     # Init logger
-    logger: Logger = configure(None, ["stdout"])
+    logger: Logger = configure(folder=None, format_strings=["stdout"])
 
     logger.info("Running stable_baselines3 PPO agent training")
 
@@ -561,22 +579,23 @@ def train_agent(perform_training: bool, perform_test: bool, run_env: bool,
         model = perform_agent_training(logger, model_save_path, best_model_save_path,
                                        tb_log_path, n_envs, n_eval_episodes, eval_freq, verbose)
     else:
-        logger.log("Training option disabled. Loading model from file")
+        logger.info("Training option disabled. Loading model from file")
         env = make_vec_env("ACS-v0")
 
         model_path = f"{best_model_save_path}/best_model" if use_best_model else model_save_path
         model = PPO.load(model_path, env)
+        model.set_logger(logger=logger)
 
     if perform_test:
         env = make_vec_env("ACS-v0")
         model.set_env(env)
         mean_rewards, std_rewards = test_agent(model, env, n_eval_episodes=test_n_eval_episodes)
-        logger.log(f"Random Performance: Rewards: {mean_rewards} +/- {std_rewards:.2f}")
+        logger.info(f"Random Performance: Rewards: {mean_rewards} +/- {std_rewards:.2f}")
 
         env = Monitor(get_ideal_scenario_env())
         model.set_env(env)
         mean_rewards, std_rewards = test_agent(model, env, n_eval_episodes=test_n_eval_episodes)
-        logger.log(f"Ideal Performance: Rewards: {mean_rewards} +/- {std_rewards:.2f}")
+        logger.info(f"Ideal Performance: Rewards: {mean_rewards} +/- {std_rewards:.2f}")
 
     if run_env:
         _perform_agent_runs(logger, model, 1)
@@ -587,6 +606,7 @@ def run_agent(model_path: str = "models/trained_model_v2", n_episodes: int = 1, 
     logger: Logger = configure(None, ["stdout"])
 
     model = PPO.load(model_path)
+    model.set_logger(logger=logger)
     _perform_agent_runs(logger, model, n_episodes, use_ideal_scenario)
 
 
