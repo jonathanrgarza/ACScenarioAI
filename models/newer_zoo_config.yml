@@ -1,0 +1,29 @@
+!!python/object/apply:collections.OrderedDict
+- - - batch_size
+    - 8
+  - - clip_range
+    - 0.1
+  - - ent_coef
+    - 9.106467242333995e-06
+  - - gae_lambda
+    - 0.95
+  - - gamma
+    - 0.98
+  - - learning_rate
+    - 0.4976487507374257
+  - - max_grad_norm
+    - 1
+  - - n_envs
+    - 3
+  - - n_epochs
+    - 20
+  - - n_steps
+    - 256
+  - - n_timesteps
+    - 10000000.0
+  - - policy
+    - MultiInputPolicy
+  - - policy_kwargs
+    - dict( activation_fn=nn.ReLU, net_arch=[dict(pi=[256, 256], vf=[256, 256])] )
+  - - vf_coef
+    - 0.6629858702970707
