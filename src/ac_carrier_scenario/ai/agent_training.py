@@ -418,7 +418,7 @@ def get_new_ppo_agent(env: Union[Env, VecEnv, str],
     if verbose:
         verbose_int = 1
 
-    model = PPO(env, tensorboard_log=tensorboard_log, verbose=verbose_int, **model_parameters)
+    model = PPO(env=env, tensorboard_log=tensorboard_log, verbose=verbose_int, **model_parameters)
     return model
 
 
