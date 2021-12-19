@@ -6,6 +6,7 @@ import logging
 import os
 import time
 from datetime import timedelta
+from pathlib import Path
 from pprint import pformat
 from typing import Optional, Union, Any, Type, Callable
 
@@ -489,17 +490,28 @@ def perform_agent_training(logger: Logger, model_save_path: str = "models/traine
     # Parallel Environments
     env = make_vec_env("ACS-v0", n_envs=n_envs)
 
+    # Convert str to a Path instance
+    path = Path(model_save_path)
+    if path.suffix == ".zip" and not path.exists():
+        raise ValueError("The model_save_path must be a valid path to a .zip file")
+    elif path.suffix != ".zip" and path.suffix != "":
+        raise ValueError("The model_save_path must be a valid path to a .zip file "
+                         "OR valid path without the .zip extension")
+
     try:
-        model = PPO.load(model_save_path, env, tensorboard_log=tb_log_path)
+        model = PPO.load(path, env, tensorboard_log=tb_log_path)
         model.verbose = verbose  # Update verbose level for loaded model
     except FileNotFoundError:
         model = None
 
+    if path.suffix == "":
+        path = Path(path.parent, f"{path.stem}.zip")
+
     if model is None:
-        logger.info(f"No existing model found at '{model_save_path}.zip'. Creating a new model to learn with")
+        logger.info(f"No existing model found at '{path}'. Creating a new model to learn with")
         model = get_new_ppo_agent(env=env, logger=logger, tensorboard_log=tb_log_path, verbose=verbose)
     else:
-        logger.info(f"Existing model found at '{model_save_path}.zip'. Will continue its learning")
+        logger.info(f"Existing model found at '{path}'. Will continue its learning")
 
     model.set_logger(logger)
 
@@ -517,9 +529,9 @@ def perform_agent_training(logger: Logger, model_save_path: str = "models/traine
         except KeyboardInterrupt:
             pass
 
-    model.save(model_save_path)
+    model.save(path)
     env.close()
-    logger.info(f"Training complete. Results saved to: '{model_save_path}.zip'")
+    logger.info(f"Training complete. Results saved to: '{path}'")
 
     return model
 
@@ -656,7 +668,14 @@ def run_agent(model_path: str = "models/trained_model_v2", n_episodes: int = 1, 
     # Init logger
     logger: Logger = configure(None, ["stdout"])
 
-    model = PPO.load(model_path)
+    path = Path(model_path)
+    if path.suffix == ".zip" and not path.exists():
+        raise ValueError("The model_path must be a valid path to a .zip file")
+    elif path.suffix != ".zip" and path.suffix != "":
+        raise ValueError("The model_path must be a valid path to a .zip file "
+                         "OR valid path without the .zip extension")
+
+    model = PPO.load(path)
     model.set_logger(logger=logger)
     _perform_agent_runs(logger, model, n_episodes, use_ideal_scenario)
 
