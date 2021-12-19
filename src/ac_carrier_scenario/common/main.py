@@ -53,6 +53,8 @@ def _add_agent_options(agent: argparse.ArgumentParser) -> None:
                        help="The path to the model file")
     enjoy.add_argument("--n_episodes", type=int, default=1,
                        help="The number of episodes/runs to perform")
+    enjoy.add_argument("--use_random_env", action="store_false",
+                       help="Use a random environment for run(s). Otherwise will use the ideal scenario")
 
 
 def _add_api_options(api: argparse.ArgumentParser) -> None:
@@ -84,7 +86,8 @@ def run_ai_agent(arguments: argparse.Namespace):
                     n_eval_episodes=arguments.n_eval_episodes, eval_freq=arguments.eval_freq,
                     verbose=arguments.verbose, test_n_eval_episodes=arguments.test_n_eval_episodes)
     elif arguments.sub_command == "enjoy":
-        run_agent(model_path=arguments.model_path, n_episodes=arguments.n_episodes)
+        run_agent(model_path=arguments.model_path, n_episodes=arguments.n_episodes,
+                  use_ideal_scenario=arguments.use_random_env)
     else:
         raise ValueError(f"Invalid sub command for agent: {arguments.sub_command}")
 

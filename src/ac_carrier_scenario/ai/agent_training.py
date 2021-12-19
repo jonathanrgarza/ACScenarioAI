@@ -19,7 +19,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import Logger, configure
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.vec_env import VecEnv
+from stable_baselines3.common.vec_env import VecEnv, DummyVecEnv
 
 from torch import nn
 
@@ -454,7 +454,10 @@ def _perform_agent_run(logger: Logger, env: Monitor, model, verbose: bool = Fals
     if not done and verbose:
         logger.log("Agent could not complete the environment")
 
-    ideal_env: SpecificAircraftCarrierScenarioEnv = env.unwrapped
+    ideal_env: Union[DummyVecEnv, VecEnv, SpecificAircraftCarrierScenarioEnv] = env.unwrapped
+    if isinstance(ideal_env, DummyVecEnv):
+        ideal_env = ideal_env.envs[0]
+
     if verbose:
         if ideal_env.is_expected_damage_met:
             logger.log("Agent met expected damage requirements")
@@ -464,8 +467,11 @@ def _perform_agent_run(logger: Logger, env: Monitor, model, verbose: bool = Fals
     return reward_score, steps, done, ideal_env.is_expected_damage_met
 
 
-def _perform_agent_runs(logger: Logger, model, n_episodes: int = 1):
-    env = Monitor(get_ideal_scenario_env())
+def _perform_agent_runs(logger: Logger, model, n_episodes: int = 1, use_ideal_scenario: bool = True):
+    if use_ideal_scenario:
+        env = Monitor(get_ideal_scenario_env())
+    else:
+        env = make_vec_env("ACS-v0")
     model.set_env(env)
 
     if n_episodes == 1:
@@ -537,12 +543,12 @@ def train_agent(perform_training: bool, perform_test: bool, run_env: bool,
         _perform_agent_runs(logger, model, 1)
 
 
-def run_agent(model_path: str = "models/trained_model_v2", n_episodes: int = 1):
+def run_agent(model_path: str = "models/trained_model_v2", n_episodes: int = 1, use_ideal_scenario: bool = True):
     # Init logger
     logger: Logger = configure(None, ["stdout"])
 
     model = PPO.load(model_path)
-    _perform_agent_runs(logger, model, n_episodes)
+    _perform_agent_runs(logger, model, n_episodes, use_ideal_scenario)
 
 
 PERFORM_TRAINING = True
