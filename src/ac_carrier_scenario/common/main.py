@@ -20,6 +20,14 @@ def _add_agent_options(agent: argparse.ArgumentParser) -> None:
                           help="The name of the study. Determines the part of file names")
     optimize.add_argument("--n_trials", type=int, default=100,
                           help="The number of trials to run")
+    optimize.add_argument("--n_envs", type=int, default=6,
+                          help="The number of parallel environments used during training")
+    optimize.add_argument("--total_timesteps", type=int, default=25000,
+                          help="The total number of timesteps for the training")
+    optimize.add_argument("--tb_log_path", default=None,
+                          help="The path to the folder to put tensorboard logs during optimization")
+    optimize.add_argument("--verbose", type=int, default=0,
+                          help="The verbose output level. 0 = None, 1 = info and 2 = debug")
 
     # Add train options
     train = subparser.add_parser("train")
@@ -31,6 +39,8 @@ def _add_agent_options(agent: argparse.ArgumentParser) -> None:
                        help="The path to the folder to put tensorboard logs during training")
     train.add_argument("--n_envs", type=int, default=6,
                        help="The number of parallel environments used during training")
+    train.add_argument("--total_timesteps", type=int, default=25000,
+                       help="The total number of timesteps for the training")
     train.add_argument("--n_eval_episodes", type=int, default=5,
                        help="The number of episodes used for evaluation")
     train.add_argument("--eval_freq", type=int, default=10000,
@@ -45,7 +55,8 @@ def _add_agent_options(agent: argparse.ArgumentParser) -> None:
                        help="Should a run of the model be run after training")
     train.add_argument("--use_trained_model", action="store_false",
                        help="Use the saved trained model instead of the best model for test and/or run")
-    train.add_argument("--verbose", action="store_true", help="Display debug information")
+    train.add_argument("--verbose", type=int, default=0,
+                       help="The verbose output level. 0 = None, 1 = info and 2 = debug")
 
     # Add enjoy options
     enjoy = subparser.add_parser("enjoy")
@@ -76,15 +87,18 @@ def _add_cli_parser_options(ap: argparse.ArgumentParser) -> None:
 
 def run_ai_agent(arguments: argparse.Namespace):
     if arguments.sub_command == "optimize":
-        perform_optuna_optimizing(arguments.study_name, arguments.n_trials)
+        perform_optuna_optimizing(study_name=arguments.study_name, n_trials=arguments.n_trials,
+                                  n_envs=arguments.n_envs, total_timesteps=arguments.total_timesteps,
+                                  verbose_level=arguments.verbose, tb_log_path=arguments.tb_log_path)
     elif arguments.sub_command == "train":
         perform_training = not arguments.skip_training
         train_agent(perform_training=perform_training, perform_test=arguments.perform_test,
                     run_env=arguments.perform_run, use_best_model=arguments.use_trained_model,
                     model_save_path=arguments.model_save_path, best_model_save_path=arguments.best_model_save_path,
                     tb_log_path=arguments.tb_log_path, n_envs=arguments.n_envs,
-                    n_eval_episodes=arguments.n_eval_episodes, eval_freq=arguments.eval_freq,
-                    verbose=arguments.verbose, test_n_eval_episodes=arguments.test_n_eval_episodes)
+                    total_timesteps=arguments.total_timesteps, n_eval_episodes=arguments.n_eval_episodes,
+                    eval_freq=arguments.eval_freq, verbose_level=arguments.verbose,
+                    test_n_eval_episodes=arguments.test_n_eval_episodes)
     elif arguments.sub_command == "enjoy":
         run_agent(model_path=arguments.model_path, n_episodes=arguments.n_episodes,
                   use_ideal_scenario=arguments.use_random_env)
@@ -124,4 +138,3 @@ def main(cli_args: List[str] = None) -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
