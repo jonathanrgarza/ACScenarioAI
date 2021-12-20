@@ -355,6 +355,9 @@ def perform_optuna_optimizing(study_name: str = "agent_study_2", n_trials: int =
     try:
         with stay_awake.keep_awake():
             _optuna_logger.info("Starting an optuna hyperparameter optimization run")
+            _optuna_logger.info(f"Optimization run parameters: Total Timesteps: {optimization_total_timesteps}, "
+                                f"Eval Episodes: {optimization_n_eval_episodes}, Eval Freq: {optimization_eval_freq}, "
+                                f"Number of Environments: {optimization_n_envs}")
             study.optimize(agent_objective, n_trials=n_trials)
             completed = True
     except KeyboardInterrupt:
