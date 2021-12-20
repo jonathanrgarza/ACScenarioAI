@@ -20,7 +20,7 @@ def _add_agent_options(agent: argparse.ArgumentParser) -> None:
                           help="The name of the study. Determines the part of file names")
     optimize.add_argument("--n_trials", type=int, default=100,
                           help="The number of trials to run")
-    optimize.add_argument("--n_envs", type=int, default=6,
+    optimize.add_argument("--n_envs", type=int, default=3,
                           help="The number of parallel environments used during training")
     optimize.add_argument("--total_timesteps", type=int, default=25000,
                           help="The total number of timesteps for the training")
@@ -43,7 +43,7 @@ def _add_agent_options(agent: argparse.ArgumentParser) -> None:
                        help="The path to the folder to save the best model found during training")
     train.add_argument("--tb_log_path", default=None,
                        help="The path to the folder to put tensorboard logs during training")
-    train.add_argument("--n_envs", type=int, default=6,
+    train.add_argument("--n_envs", type=int, default=3,
                        help="The number of parallel environments used during training")
     train.add_argument("--total_timesteps", type=int, default=25000,
                        help="The total number of timesteps for the training")
