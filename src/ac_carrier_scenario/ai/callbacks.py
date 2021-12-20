@@ -1,6 +1,7 @@
 """
 Module for the trial evaluation callback class.
 """
+from datetime import datetime
 from typing import Optional, Union
 
 import optuna
@@ -40,3 +41,31 @@ class TrialEvalCallback(EvalCallback):
                 self.is_pruned = True
                 return False
         return True
+
+
+class TrainingEvalCallback(EvalCallback):
+    """
+    stable_baselines3 callback used during training to provide additional information.
+    """
+
+    def __init__(self,
+                 eval_env: Union[gym.Env, VecEnv, Monitor],
+                 callback_on_new_best: Optional[BaseCallback] = None, n_eval_episodes: int = 5,
+                 eval_freq: int = 10000, log_path: Optional[str] = None,
+                 best_model_save_path: Optional[str] = None, deterministic: bool = True,
+                 render: bool = False, verbose: int = 1, warn: bool = True
+                 ):
+        super().__init__(eval_env, callback_on_new_best=callback_on_new_best,
+                         n_eval_episodes=n_eval_episodes, eval_freq=eval_freq, log_path=log_path,
+                         best_model_save_path=best_model_save_path, deterministic=deterministic,
+                         render=render, verbose=verbose, warn=warn)
+        self._n_steps = 0
+
+    def _on_step(self) -> bool:
+        result = super()._on_step()
+
+        self._n_steps += 1
+        if self.verbose > 0 and (self._n_steps % 100 == 0 or self._n_steps == 1):
+            print(f"[{datetime.now()}] Current time step #{self._n_steps}")
+
+        return result

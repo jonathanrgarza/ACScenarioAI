@@ -17,7 +17,6 @@ from gym import Env
 from gym.wrappers import TimeLimit
 from optuna.visualization import plot_optimization_history, plot_param_importances
 from stable_baselines3 import PPO, A2C
-from stable_baselines3.common.callbacks import EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.logger import Logger, configure, INFO
@@ -31,7 +30,7 @@ from torch import nn
 from ac_carrier_scenario.common.scenarios import AircraftCarrierScenario
 from ac_carrier_scenario.common.environment import SpecificAircraftCarrierScenarioEnv
 import ac_carrier_scenario.util.stay_awake as stay_awake
-from ac_carrier_scenario.ai.trial_eval_callback import TrialEvalCallback
+from ac_carrier_scenario.ai.callbacks import TrialEvalCallback, TrainingEvalCallback
 
 
 def clear_console() -> None:
@@ -559,9 +558,9 @@ def perform_agent_training(logger: Logger, model_save_path: str = "models/traine
     eval_env = Monitor(gym.make("ACS-v0"))
     # callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=10, verbose=1)
     callback_on_best = None
-    eval_callback = EvalCallback(eval_env=eval_env, callback_on_new_best=callback_on_best,
-                                 best_model_save_path=best_model_save_path, eval_freq=eval_freq,
-                                 n_eval_episodes=n_eval_episodes, verbose=eval_verbose)
+    eval_callback = TrainingEvalCallback(eval_env=eval_env, callback_on_new_best=callback_on_best,
+                                         best_model_save_path=best_model_save_path, eval_freq=eval_freq,
+                                         n_eval_episodes=n_eval_episodes, verbose=eval_verbose)
     with stay_awake.keep_awake():
         try:
             model.learn(total_timesteps=total_timesteps, callback=eval_callback)
