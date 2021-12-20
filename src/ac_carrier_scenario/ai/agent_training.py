@@ -707,12 +707,11 @@ def run_agent(model_path: str = "models/trained_model_v2", n_episodes: int = 1, 
     # Init logger
     logger: Logger = configure(None, ["stdout"])
 
+    # Convert str to a Path instance
     path = Path(model_path)
-    if path.suffix == ".zip" and not path.exists():
-        raise ValueError("The model_path must be a valid path to a .zip file")
-    elif path.suffix != ".zip" and path.suffix != "":
+    if path.suffix.lower() != ".zip" and path.suffix != "":
         raise ValueError("The model_path must be a valid path to a .zip file "
-                         "OR valid path without the .zip extension")
+                         "OR valid file path without the .zip extension")
 
     model = PPO.load(path)
     model.set_logger(logger=logger)
