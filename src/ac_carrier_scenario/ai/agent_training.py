@@ -126,14 +126,29 @@ optimization_total_timesteps: int = 25000  # "25000"
     The total number of timesteps to use for each trial.
 """
 
+optimization_n_eval_episodes: int = 5  # "5"
+"""
+    The number of episodes used for evaluation for each trial. Must be greater than 1.
+"""
+
+optimization_eval_freq: int = 10000  # "10000"
+"""
+    The timesteps between evaluations for each trial. Must be less than optimization_total_timesteps but greater than 1.
+"""
+
 optimization_n_envs: int = 1  # "1"
 """
     The number of parallel environments to use during optimization.
 """
 
-optimization_verbose: int = 0  # "0" : No output
+optimization_learning_verbose: int = 0  # "0" : No output
 """
     If the optimization learning will have verbose output.
+"""
+
+optimization_eval_verbose: int = 1  # "0" : No output
+"""
+    If the optimization learning evaluation will have verbose output.
 """
 
 
@@ -148,8 +163,11 @@ def agent_objective(trial: optuna.Trial) -> int:
     global _optuna_logger
     global optimization_tb_log_path
     global optimization_total_timesteps
+    global optimization_n_eval_episodes
+    global optimization_eval_freq
     global optimization_n_envs
-    global optimization_verbose
+    global optimization_learning_verbose
+    global optimization_eval_verbose
 
     # Create the gym model
     # gym_env: Env = gym.make("ACS-v0")
@@ -221,7 +239,7 @@ def agent_objective(trial: optuna.Trial) -> int:
                     n_epochs=n_epochs, batch_size=batch_size, ent_coef=ent_coef, clip_range=clip_range,
                     gae_lambda=gae_lambda, max_grad_norm=max_grad_norm, vf_coef=vf_coef,
                     policy_kwargs=policy_kwargs,
-                    tensorboard_log=optimization_tb_log_path, verbose=optimization_verbose)
+                    tensorboard_log=optimization_tb_log_path, verbose=optimization_learning_verbose)
     elif algorithm == "A2C":
         # Get trial's hyperparameters that are for A2C algorithm only
         ortho_init = trial.suggest_categorical("ortho_init", [False, True])
@@ -245,12 +263,14 @@ def agent_objective(trial: optuna.Trial) -> int:
                     gae_lambda=gae_lambda, ent_coef=ent_coef, vf_coef=vf_coef, max_grad_norm=max_grad_norm,
                     use_rms_prop=use_rms_prop, normalize_advantage=normalize_advantage,
                     policy_kwargs=policy_kwargs,
-                    tensorboard_log=optimization_tb_log_path, verbose=optimization_verbose)
+                    tensorboard_log=optimization_tb_log_path, verbose=optimization_learning_verbose)
     else:
         raise ValueError(f"Invalid algorithm selected: {algorithm}")
 
     # Create the evaluation callback
-    eval_callback = TrialEvalCallback(eval_env, trial, verbose=optimization_verbose)
+    eval_callback = TrialEvalCallback(eval_env, trial, n_eval_episodes=optimization_n_eval_episodes,
+                                      eval_freq=max(optimization_eval_freq // optimization_n_envs, 1),
+                                      verbose=optimization_eval_verbose)
 
     try:
         # No keep awake needed here as this is called by optuna which has been kept awake
@@ -283,12 +303,17 @@ def agent_objective(trial: optuna.Trial) -> int:
 
 
 def perform_optuna_optimizing(study_name: str = "agent_study_2", n_trials: int = 100, total_timesteps: int = 25000,
-                              verbose_level: int = 0, n_envs: int = 1, tb_log_path: Optional[str] = None):
+                              n_eval_episodes: int = 5, eval_freq: int = 10000, n_envs: int = 1,
+                              learning_verbose_level: int = 0, eval_verbose_level: int = 1,
+                              tb_log_path: Optional[str] = None):
     global _optuna_logger
     global optimization_tb_log_path
     global optimization_total_timesteps
+    global optimization_n_eval_episodes
+    global optimization_eval_freq
     global optimization_n_envs
-    global optimization_verbose
+    global optimization_learning_verbose
+    global optimization_eval_verbose
     # Add stream handler of stdout to show the messages
     _optuna_logger = optuna.logging.get_logger("optuna")
     # These are not needed as they are the default for optuna's logger
@@ -313,8 +338,17 @@ def perform_optuna_optimizing(study_name: str = "agent_study_2", n_trials: int =
     optimization_tb_log_path = tb_log_path
 
     optimization_total_timesteps = total_timesteps
+    optimization_n_eval_episodes = n_eval_episodes
+    optimization_eval_freq = eval_freq
     optimization_n_envs = n_envs
-    optimization_verbose = verbose_level
+    optimization_learning_verbose = learning_verbose_level
+    optimization_eval_verbose = eval_verbose_level
+
+    if optimization_n_eval_episodes <= 0:
+        raise ValueError("n_eval_episodes must be greater than 0")
+
+    if optimization_eval_freq > optimization_total_timesteps:
+        raise ValueError("eval_freq cannot be greater than total_timesteps")
 
     completed = False
 
@@ -374,6 +408,7 @@ def perform_optuna_optimizing(study_name: str = "agent_study_2", n_trials: int =
         json.dump(obj=ideal_params, fp=json_file, indent=4)
 
     # Plot optimization result
+    _optuna_logger.info("Displaying optimization plots")
     try:
         fig1 = plot_optimization_history(study)
         fig2 = plot_param_importances(study)
@@ -486,34 +521,35 @@ def get_new_ppo_agent(env: Union[Env, VecEnv, str], logger: Optional[Logger] = N
 def perform_agent_training(logger: Logger, model_save_path: str = "models/trained_model_v2",
                            best_model_save_path: str = "models", tb_log_path: Optional[str] = None,
                            n_envs: int = 6, total_timesteps: int = 25000, n_eval_episodes: int = 5,
-                           eval_freq: int = 10000, verbose: int = 0):
+                           eval_freq: int = 10000, learning_verbose: int = 0, eval_verbose: int = 0):
     # Parallel Environments
     env = make_vec_env("ACS-v0", n_envs=n_envs)
 
     # Convert str to a Path instance
     path = Path(model_save_path)
-    if path.suffix == ".zip" and not path.exists():
-        raise ValueError("The model_save_path must be a valid path to a .zip file")
-    elif path.suffix != ".zip" and path.suffix != "":
+    if path.suffix.lower() != ".zip" and path.suffix != "":
         raise ValueError("The model_save_path must be a valid path to a .zip file "
-                         "OR valid path without the .zip extension")
+                         "OR valid file path without the .zip extension")
 
-    try:
-        model = PPO.load(path, env, tensorboard_log=tb_log_path)
-        model.verbose = verbose  # Update verbose level for loaded model
-    except FileNotFoundError:
-        model = None
+    model = None
+    if path.exists() or path.suffix == "" or path.suffix.lower() == ".zip":
+        try:
+            model = PPO.load(path, env, tensorboard_log=tb_log_path)
+            model.verbose = learning_verbose  # Update verbose level for loaded model
+        except FileNotFoundError:
+            model = None
 
     if path.suffix == "":
         path = Path(path.parent, f"{path.stem}.zip")
 
     if model is None:
         logger.info(f"No existing model found at '{path}'. Creating a new model to learn with")
-        model = get_new_ppo_agent(env=env, logger=logger, tensorboard_log=tb_log_path, verbose=verbose)
+        model = get_new_ppo_agent(env=env, logger=logger, tensorboard_log=tb_log_path, verbose=learning_verbose)
     else:
         logger.info(f"Existing model found at '{path}'. Will continue its learning")
 
-    model.set_logger(logger)
+    if learning_verbose > 0:
+        model.set_logger(logger)
 
     # Set callbacks
     # Separate evaluation environment
@@ -522,7 +558,7 @@ def perform_agent_training(logger: Logger, model_save_path: str = "models/traine
     callback_on_best = None
     eval_callback = EvalCallback(eval_env=eval_env, callback_on_new_best=callback_on_best,
                                  best_model_save_path=best_model_save_path, eval_freq=eval_freq,
-                                 n_eval_episodes=n_eval_episodes, verbose=verbose)
+                                 n_eval_episodes=n_eval_episodes, verbose=eval_verbose)
     with stay_awake.keep_awake():
         try:
             model.learn(total_timesteps=total_timesteps, callback=eval_callback)
@@ -628,7 +664,7 @@ def train_agent(perform_training: bool, perform_test: bool, run_env: bool,
                 model_save_path: str = "models/trained_model_v2",
                 best_model_save_path: str = "models", tb_log_path: Optional[str] = None,
                 n_envs: int = 6, total_timesteps: int = 25000, n_eval_episodes: int = 5, eval_freq: int = 10000,
-                verbose_level: int = 0, test_n_eval_episodes: int = 10):
+                learning_verbose_level: int = 0, eval_verbose_level: int = 1, test_n_eval_episodes: int = 10):
     # Init logger
     logger: Logger = configure(folder=None, format_strings=["stdout"])
 
@@ -640,7 +676,8 @@ def train_agent(perform_training: bool, perform_test: bool, run_env: bool,
 
     if perform_training:
         model = perform_agent_training(logger, model_save_path, best_model_save_path,
-                                       tb_log_path, n_envs, total_timesteps, n_eval_episodes, eval_freq, verbose_level)
+                                       tb_log_path, n_envs, total_timesteps, n_eval_episodes, eval_freq,
+                                       learning_verbose_level, eval_verbose_level)
     else:
         logger.info("Training option disabled. Loading model from file")
         env = make_vec_env("ACS-v0")
