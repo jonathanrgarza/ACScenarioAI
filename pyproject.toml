@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "AC_Carrier_Scenario"
+version = "1.0"
+description = "AI Project related to an AC Carrier Scenario"
+authors = [
+    { name = "Jonathan Garza" }
+]
+dependencies = [
+    "numpy~=1.26.4",
+    "gym~=0.26.2",
+    "optuna~=2.10.0",
+    "plotly~=5.4.0",
+    "scikit-learn~=1.5.2",
+    "protobuf==3.20.*",
+    "stable_baselines3~=2.3.2",
+    "tensorboard~=2.7.0",
+    "flask>=2.0.2",
+    "torch~=2.4.1",
+    "setuptools~=75.1.0"
+]
+
+[project.urls]
+homepage = "https://github.com/jonathanrgarza/ACScenarioAI"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ac_carrier_scenario.*"]
+
+[project.scripts]
+ac_carrier_scenario = "ac_carrier_scenario.common.main:main"
